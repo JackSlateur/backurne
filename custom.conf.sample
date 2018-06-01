@@ -1,0 +1,158 @@
+#
+config = {
+	# All our snapshot, on live, will use this prefix.
+	# Every snapshot prefixed by this prefix will be handled
+	# (and possibly deleted)
+	# Must not contains a single quote ( "'" ) nor a semicolon ( ";" )
+	#'snap_prefix': 'backup',
+
+	# Define our backup policy : when should be make a snap
+	# How many backups should we store
+	# How many backups should be kept on live (for faster restore)
+	# Regardless of this setting, the last snapshot will
+	# always be kept on live (for incremental purpose)
+	# Default: empty
+	#'profiles': {
+	#	'daily': {
+	#		'count': 30,
+	#		'max_on_live': 0,
+	#	},
+	#	'hourly': {
+	#		'count': 48,
+	#		'max_on_live': 0,
+	#	},
+	#},
+
+	# Fetch additionnal profiles, per VM
+	# If set to None, the default, no fetch is made
+	# Else, it must be an URL, http or https
+	# Backurne POST a json with VM's informations, and
+	# expect a json dict which contains additionnal profiles
+	# or an empty dict
+	# See sample-api-profile.py for a simple implementation
+	#'profiles_api': None,
+
+	# Where should we store the backups ?
+	# The pool is dedidated
+	#'backup_cluster': {
+	#	'pool': 'rbd',
+	#},
+
+	# List of live clusters to back up
+	#'live_clusters': [
+	#	# A sample proxmox cluster
+	#	# We will connect to it using http(s)
+	#	{
+	#		# A handy name
+	#		'name': 'clusterpx',
+	#		'fqdn': 'clusterpx.fqdn.org',
+	#		'user': 'root@pam',
+	#		'passwd': 'awesome-passwd',
+	#		'tls': True,
+	#		'use_smbios': True,
+	#		'type': 'proxmox',
+	#	},
+	#
+	#	# A sample plain cluster
+	#	# We will connect to it using ssh
+	#	# You have to ensure backurne can connect
+	#	# to it using ssh keys
+	#	{
+	#		'name': 'cute-cluster',
+	#		'fqdn': 'ceph.fqdn.org',
+	#		'type': 'plain',
+	#		'pool': 'vms'
+	#	},
+	#],
+
+	# Extra retention time for the last remaining backup, in day.
+	# When an image is deleted from the live cluster,
+	# it's backup image will slowly fade away with time
+	# (each hour / day, a backup will be deleted)
+	# Thus, with a 30 daily profile, the last backup will
+	# be deleted 30 days after live's deleting
+	# This setting increase the retention time, only for that
+	# last backup.
+	# If set to 30 and with a 30 daily profile, data will
+	# be kept around for 60 days.
+	#'extra_retention_time': 0,
+
+	# Override ceph's endpoint
+	# We need to connect to the Ceph live cluster
+	# Identification we have: proxmox's name, and Ceph's name (from proxmox)
+	# That name does not necessarily maps to a domain name, thus some mapping
+	# may be required (editing /etc/hosts may works too)
+	# Plus, you can have the same name on multiple proxmox clusters, but
+	# pointing on different Ceph cluster
+	# This entry is a dict of dicts:
+	# - the first level is the proxmox's name, or 'default' as a catch-all
+	# - the second level is the Ceph's name inside that proxmox cluster
+	# ceph_endpoint[proxmox][ceph] has the precedence
+	# Then ceph_endpoint['default'][ceph]
+	# If nothing match, the Ceph's name is used as-is, and must
+	# resolves
+	# Default: empty
+	#'ceph_endpoint': {
+	#	'default': {
+	#		'ceph1': 'cluster1.fqdn.org',
+	#	},
+	#	'proxmox32-lab': {
+	#		'pool-ssd': 'cephlab.fqdn.org',
+	#		'pool-hdd': 'cephlab.fqdn.org',
+	#	}
+	#},
+
+	# How many processes shall be used for compressing a
+	# single export-diff
+	# If set to 0, compression is disabled and pigz is not required
+	#'pigz_processes': 12,
+
+	# Should we freeze the VM before snapshotting ?
+	# This requires qemu-guest-agent
+	# Beware, a current bug lives in proxmox: if qemu-quest-agent
+	# is enabled on the VM, but the daemon inside that VM is dead,
+	# then the proxmox API will be stuck in an endless loop for
+	# ~1H
+	#'fsfreeze': False,
+
+	# If we set use_smbios to True, but encounter a VM
+	# without smbios, what should we do ?
+	# If True, we fallback, as if use_smbios is False, for this VM
+	# If False, we drop an error and skip the VM
+	# If fallback is used, and an uuid is defined afterward,
+	# you will lose this VM's backup history
+	# (as if it was newly created)
+	#'uuid_fallback': True,
+
+	# Print pretty color, if stdout is a tty
+	#'pretty_colors': True,
+
+	# Log level
+	# Can be any of 'debug', 'info', 'warn', 'err'
+	#'log_level': 'debug',
+
+	# We can parallelize old backup expiration
+	# The more process we use, the more pressure is made on the
+	# backup cluster, IO wise
+	#'expire_processes': 24,
+
+	# We can parallelize the snapshot creation
+	# This is roughly the same setting as 'expire_processes',
+	# except that it impact the live cluster
+	#'snapshooter_processes': 10,
+
+	# Hash binary used to compare snapshots
+	# You can you any executable that meet the follow requirements:
+	# - eat data from stdin
+	# - require no argument
+	# - output the hash to stdout as the word
+	# The output may contains other words (space-separated list of char),
+	# which will be ignored
+	# This can be an absolute path, yet a $PATH lookup can be used
+	# Default to md5sum
+	# Using xxhash or murmur3 is recommanded, because they are way faster
+	# than md5sum, and we do not require any cryptographic properties
+	# This executable must live on every Ceph cluster, as well as the backup
+	# node, because hash is done remotely
+	#'hash_binary': 'md5sum',
+}
