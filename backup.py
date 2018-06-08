@@ -6,11 +6,12 @@ from log import log as Log
 
 
 class Bck(object):
-	def __init__(self, name, ceph, rbd, vm=None):
+	def __init__(self, name, ceph, rbd, vm=None, adapter=None):
 		self.name = name
 		self.ceph = ceph
 		self.rbd = rbd
 		self.vm = vm
+		self.adapter = adapter
 
 		self.source = '%s:%s' % (self.name, self.rbd)
 
@@ -30,7 +31,7 @@ class Bck(object):
 					ident = self.vm['smbios']
 			comment = self.vm['name']
 
-		dest = '%s;%s;%s' % (ident, self.rbd, comment)
+		dest = '%s;%s;%s' % (ident, self.adapter, comment)
 		return dest
 
 	def __snap_name(self, profile, value):

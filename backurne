@@ -86,7 +86,7 @@ class Check(object):
 		for vm in self.px.vms():
 			for disk in vm['to_backup']:
 				ceph = self.px.ceph_storage[disk['ceph']]
-				backup = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm)
+				backup = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
 				data.append({'ceph': ceph, 'backup': backup, 'image': disk['rbd']})
 
 		self.err = list()
@@ -105,7 +105,7 @@ class Check(object):
 		for vm in self.px.vms():
 			for disk in vm['to_backup']:
 				ceph = self.px.ceph_storage[disk['ceph']]
-				backup = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm)
+				backup = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
 				self.cmp_snap(backup, ceph, disk['rbd'])
 		return self.err
 
@@ -182,7 +182,7 @@ class Backup(object):
 			snaps = list()
 			for disk in vm['to_backup']:
 				ceph = px.ceph_storage[disk['ceph']]
-				backup = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm)
+				backup = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
 
 				profiles = self.__fetch_profiles(vm, disk)
 				for profile, value in profiles:

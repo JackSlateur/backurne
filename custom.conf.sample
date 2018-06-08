@@ -43,7 +43,7 @@ config = {
 	#	# A sample proxmox cluster
 	#	# We will connect to it using http(s)
 	#	{
-	#		# A handy name
+	#		# A handy name, which MUST be unique
 	#		'name': 'clusterpx',
 	#		'fqdn': 'clusterpx.fqdn.org',
 	#		'user': 'root@pam',
@@ -58,6 +58,7 @@ config = {
 	#	# You have to ensure backurne can connect
 	#	# to it using ssh keys
 	#	{
+	#		# A handy name, which MUST be unique
 	#		'name': 'cute-cluster',
 	#		'fqdn': 'ceph.fqdn.org',
 	#		'type': 'plain',

@@ -44,14 +44,14 @@ You can run this command many time, as it will avoid doing backups if the previo
 Now, we should list our backuped disks:
 ```
 17% [jack:~/backurne]./backurne ls
-+-----------------+-----------------+--------------------------------------------------------------------+
-|  Ident          |  Disk           |  UUID                                                              |
-+-----------------+-----------------+--------------------------------------------------------------------+
-|  test-backurne  |  vm-136-disk-1  |  8eb4f698-afdc-45bb-9f6c-1833c42ae368;vm-136-disk-1;test-backurne  |
-+-----------------+-----------------+--------------------------------------------------------------------+
++-----------------+---------+--------------------------------------------------------------------+
+|  Ident          |  Disk   |  UUID                                                              |
++-----------------+---------+--------------------------------------------------------------------+
+|  test-backurne  |  scsi0  |  8eb4f698-afdc-45bb-9f6c-1833c42ae368;vm-136-disk-1;test-backurne  |
++-----------------+---------+--------------------------------------------------------------------+
 ```
  - `ident` is used as an identificator for human: for Proxmox's backups, this is the VM's name from the last run.
- - `Disk` is the disk name.
+ - `Disk` is the disk adapter for proxmox, or the rbd image name for plain.
  - Finally, `UUID` is the real RBD image, as defined on Ceph, and is used as a primary key.
 
 

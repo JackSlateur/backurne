@@ -69,14 +69,14 @@ class Proxmox(object):
 
 		# "No backup" is set
 		if re.match('.*backup=0.*', str(value)):
-			return None, None
+			return None, None, None
 
 		if not disk:
-			return None, None
+			return None, None, None
 
 		storage, volume = value.split(':')
 		if storage not in self.ceph_storage:
-			return None, None
+			return None, None, None
 
 		volume = volume.split(',')[0]
 
@@ -84,17 +84,17 @@ class Proxmox(object):
 		if match is None:
 			match = re.match('base-([0-9]+)-disk-[0-9]+', volume)
 		if match.group(1) != str(self.vmid):
-			return None, None
+			return None, None, None
 
-		return storage, volume
+		return storage, volume, key
 
 	def get_disks(self, conf):
 		result = list()
 		for key, value in conf.items():
-			storage, volume = self.__extract_disk(key, value)
+			storage, volume, adapter = self.__extract_disk(key, value)
 			if storage is None:
 				continue
-			result.append({'ceph': storage, 'rbd': volume})
+			result.append({'ceph': storage, 'rbd': volume, 'adapter': adapter})
 		return result
 
 	def list_qemu(self, name):
