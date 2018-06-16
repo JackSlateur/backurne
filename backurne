@@ -170,6 +170,7 @@ class Backup(object):
 		return profiles
 
 	def create_snaps(self, vm):
+		snaps = list()
 		try:
 			# Is the proxmoxer thread-safe ?
 			px = Proxmox(self.cluster)
@@ -179,7 +180,6 @@ class Backup(object):
 			# and we must not keep the VM frozen more than necessary
 			px.freeze(vm['node'], vm)
 
-			snaps = list()
 			for disk in vm['to_backup']:
 				ceph = px.ceph_storage[disk['ceph']]
 				backup = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
@@ -197,10 +197,9 @@ class Backup(object):
 								'backup': backup,
 						})
 			px.thaw(vm['node'], vm)
-			return snaps
 		except Exception as e:
 			Log.warn('create_snaps: %s thrown while processing %s' % (e, vm))
-			return list()
+		return snaps
 
 	def expire_live(self, vm):
 		try:
