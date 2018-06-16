@@ -26,12 +26,14 @@ class Bck(object):
 		comment = None
 
 		if self.vm is not None:
+			comment = self.vm['name']
 			if self.vm['px'].px_config['use_smbios']:
 				if self.vm['smbios'] is not None:
 					ident = self.vm['smbios']
-			comment = self.vm['name']
+					dest = '%s;%s;%s' % (ident, self.adapter, comment)
+					return dest
 
-		dest = '%s;%s;%s' % (ident, self.adapter, comment)
+		dest = '%s;%s;%s' % (ident, self.rbd, comment)
 		return dest
 
 	def __snap_name(self, profile, value):
