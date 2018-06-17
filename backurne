@@ -248,7 +248,7 @@ class Backup(object):
 			backup.expire_live()
 
 
-def is_expired(snap, extra, last=False):
+def is_expired(snap, last=False):
 	splited = snap.split(';')
 	created_at = dateutil.parser.parse(splited[-1])
 	profile = splited[-3]
@@ -263,7 +263,7 @@ def is_expired(snap, extra, last=False):
 
 	expired_at = created_at + expiration
 	if last is True:
-		expired_at += extra
+		expired_at += datetime.timedelta(days=config['extra_retention_time'])
 
 	now = datetime.datetime.now()
 	if expired_at > now:
@@ -274,7 +274,6 @@ def is_expired(snap, extra, last=False):
 def expire_img(i):
 	ceph = i['ceph']
 	image = i['image']
-	extra = i['extra']
 
 	snaps = ceph.backup.snap(image)
 	try:
@@ -289,13 +288,13 @@ def expire_img(i):
 		return
 
 	for snap in snaps:
-		if not is_expired(snap, extra):
+		if not is_expired(snap):
 			continue
 		ceph.backup.rm_snap(image, snap)
 
 	snaps = ceph.backup.snap(image)
 	if len(snaps) == 1:
-		if is_expired(last, extra, last=True):
+		if is_expired(last, last=True):
 			ceph.backup.rm_snap(image, snaps[0])
 
 	if len(ceph.backup.snap(image)) == 0:
@@ -372,19 +371,18 @@ if __name__ == '__main__':
 
 	if action in ('backup', 'check', 'check-snap'):
 		loop(action)
-		if action == 'backup':
-			Log.info('Expiring our snapshots')
-			# Dummy Ceph object used to retrieve the real backup Object
-			ceph = Ceph(None)
+		if action != 'backup':
+			exit(0)
+		Log.info('Expiring our snapshots')
+		# Dummy Ceph object used to retrieve the real backup Object
+		ceph = Ceph(None)
 
-			extra = datetime.timedelta(days=config['extra_retention_time'])
-
-			pool = multiprocessing.Pool(config['expire_processes'])
-			data = list()
-			for i in ceph.backup.ls():
-				data.append({'ceph': ceph, 'image': i, 'extra': extra})
-			for i in pool.imap_unordered(expire_img, data):
-				pass
+		pool = multiprocessing.Pool(config['expire_processes'])
+		data = list()
+		for i in ceph.backup.ls():
+			data.append({'ceph': ceph, 'image': i})
+		for i in pool.imap_unordered(expire_img, data):
+			pass
 		exit(0)
 
 	try:
