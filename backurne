@@ -54,7 +54,7 @@ class Check(object):
 
 			when = last.split(';')[3]
 			when = dateutil.parser.parse(when)
-			deadline = datetime.timedelta(days=1)
+			deadline = datetime.timedelta(days=1) + datetime.timedelta(hours=6)
 			deadline = datetime.datetime.now() - deadline
 			if when < deadline:
 				msg = 'Backup found for %s, yet too old (created at %s)' % (rbd, when)
