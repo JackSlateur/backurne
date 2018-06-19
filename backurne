@@ -306,10 +306,11 @@ def loop(args):
 	result = list()
 
 	for cluster in config['live_clusters']:
-		Log.info('Processing %s: %s' % (cluster['type'], cluster['name']))
 		if args == 'backup':
+			Log.info('Backuping %s: %s' % (cluster['type'], cluster['name']))
 			Backup(cluster)
 		else:
+			Log.info('Checking %s: %s' % (cluster['type'], cluster['name']))
 			check = Check(cluster)
 			if args == 'check':
 				ret = check.check()
