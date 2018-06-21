@@ -95,7 +95,17 @@ class Restore(object):
 				kpartx = True
 				break
 			if part_type == 'xfs':
-				sh.Command('xfs_repair')('-L', self.dev)
+				# Dirty hack
+				# We need to zero the xfs logs
+				# However, a full xfs_repair can be quite long
+				# As the zero log is really fast, 30sec should
+				# be enough
+				try:
+					sh.Command('timeout')('30', 'xfs_repair', '-L', self.dev)
+				except:
+					# If xfs_repair timed out, an
+					# Exception is thrown. Do not care.
+					pass
 
 		self.tmp_dir = tempfile.mkdtemp()
 		try:
