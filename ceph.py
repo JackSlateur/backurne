@@ -122,7 +122,7 @@ class Ceph(object):
 		Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
 
 		# Should be enough .. right ?
-		time.sleep(0.5)
+		time.sleep(1)
 		for mapped in self.get_mapped():
 			if mapped['image'] == image:
 				return mapped['dev']
