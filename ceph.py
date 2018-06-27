@@ -173,7 +173,7 @@ class Ceph(object):
 		# I have not figured out how do fast data transfert
 		# between processes with python3-sh
 		snap = self.__esc(snap)
-		export = ['export-diff', image, '--snap', snap]
+		export = ['export-diff', '--no-progress', image, '--snap', snap]
 		export = str(self.cmd).split(' ') + export
 		if last_snap is None:
 			export += ['-', ]
@@ -183,9 +183,9 @@ class Ceph(object):
 
 		if config['download_compression'] is True:
 			export += ['|', 'gzip']
-			imp = 'gunzip | %s import-diff - "%s"' % (self.backup.cmd, dest)
+			imp = 'gunzip | %s import-diff --no-progress - "%s"' % (self.backup.cmd, dest)
 		else:
-			imp = '%s import-diff - "%s"' % (self.backup.cmd, dest)
+			imp = '%s import-diff --no-progress - "%s"' % (self.backup.cmd, dest)
 
 		p1 = Popen(export, stdout=PIPE)
 
