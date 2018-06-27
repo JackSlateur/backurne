@@ -116,7 +116,14 @@ class Check(object):
 		return self.err
 
 
-# High level class, used for backup-related stuff
+def dl_worker(snap):
+	try:
+		backup = snap['backup']
+		backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
+	except Exception as e:
+		Log.error(e)
+
+
 class Backup(object):
 	def __init__(self, cluster):
 		self.cluster = cluster
@@ -224,9 +231,9 @@ class Backup(object):
 		pool.join()
 
 		Log.info('I will now download %s snaps from px %s' % (len(new_snaps), self.cluster['name']))
-		for snap in new_snaps:
-			backup = snap['backup']
-			backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
+		truc = multiprocessing.get_context('spawn').Pool(config['download_worker'])
+		for i in truc.imap_unordered(dl_worker, new_snaps):
+			pass
 
 		pool = multiprocessing.Pool(config['snapshooter_processes'])
 		for i in pool.imap_unordered(self.expire_live, vms):

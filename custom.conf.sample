@@ -103,10 +103,13 @@ config = {
 	#	}
 	#},
 
-	# How many processes shall be used for compressing a
-	# single export-diff
-	# If set to 0, compression is disabled and pigz is not required
-	#'pigz_processes': 12,
+	# How many worker should I use to download the
+	# backups ?
+	#'download_worker': 12,
+
+	# If set to True, snapshots are compressed during transfert
+	# Usefull if you have a low bandwith
+	#'download_compression': False,
 
 	# Should we freeze the VM before snapshotting ?
 	# This requires qemu-guest-agent

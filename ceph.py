@@ -181,9 +181,9 @@ class Ceph(object):
 			last_snap = self.__esc(last_snap)
 			export += ['--from-snap', last_snap, '-']
 
-		if config['pigz_processes'] > 0:
-			export += ['|', 'pigz', '-p', str(config['pigz_processes']), '-f', '-']
-			imp = 'unpigz -f - | %s import-diff - "%s"' % (self.backup.cmd, dest)
+		if config['download_compression'] is True:
+			export += ['|', 'gzip']
+			imp = 'gunzip | %s import-diff - "%s"' % (self.backup.cmd, dest)
 		else:
 			imp = '%s import-diff - "%s"' % (self.backup.cmd, dest)
 
