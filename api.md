@@ -33,7 +33,7 @@ Lastly, the API code **must** be run as root (well, it must CAP_SYS_ADMIN), beca
 
 ## Map a snapshot
 ```
-11% [jack@jack:~]curl -s "http://localhost:5000/map/8eb4f698-afdc-45bb-9f6c-1833c42ae368;vm-136-disk-1;test-backurne/" | python -mjson.tool
+11% [jack@jack:~]curl -s "http://localhost:5000/map/8eb4f698-afdc-45bb-9f6c-1833c42ae368;vm-136-disk-1;test-backurne/backup;hourly;48;2018-06-01T15:44:26.499066/" | python -mjson.tool
 {
     "path": "tmp4_6ipuaw",
     "success": true
