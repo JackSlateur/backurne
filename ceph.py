@@ -17,7 +17,7 @@ class Ceph(object):
 			self.cmd = sh.Command('rbd').bake('-p', pool)
 			self.esc = False
 		else:
-			self.cmd = sh.Command('ssh').bake(endpoint, 'rbd', '-p', pool)
+			self.cmd = sh.Command('ssh').bake('-n', endpoint, 'rbd', '-p', pool)
 			self.esc = True
 
 		self.json = self.cmd.bake('--format', 'json')
