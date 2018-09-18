@@ -5,7 +5,7 @@ from config import config
 from log import log as Log
 
 
-class Bck(object):
+class Bck():
 	def __init__(self, name, ceph, rbd, vm=None, adapter=None):
 		self.name = name
 		self.ceph = ceph

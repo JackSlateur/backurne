@@ -8,7 +8,7 @@ from subprocess import Popen, PIPE, DEVNULL
 import sh
 
 
-class Ceph(object):
+class Ceph():
 	def __init__(self, pool, is_backup=False, endpoint=None):
 		self.pool = pool
 		if is_backup:

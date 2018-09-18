@@ -1,5 +1,4 @@
 import dateutil.parser
-import multiprocessing
 import os
 import tempfile
 import time
@@ -9,7 +8,7 @@ from ceph import Ceph
 import sh
 
 
-class Restore(object):
+class Restore():
 	def __init__(self, rbd=None, snap=None):
 		self.ceph = Ceph(None).backup
 		self.tmp_dir = None
