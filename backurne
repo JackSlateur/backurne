@@ -1,35 +1,25 @@
 #!/usr/bin/python3
 
+import atexit
 import datetime
 import dateutil.parser
 import multiprocessing
-from termcolor import colored
 import requests
 import sys
 
+import pretty
 from config import config
 from log import log as Log
 from ceph import Ceph
 from proxmox import Proxmox
 from restore import Restore
-from prettytable import PrettyTable
 from backup import Bck
 
 
-# High level class, used for check-related stuff
-class Check(object):
+class Check():
 	def __init__(self, cluster):
 		self.cluster = cluster
 		self.err = list()
-
-		if cluster['type'] == 'proxmox':
-			self.px = Proxmox(cluster)
-			self.check = self.check_px
-			self.check_snap = self.check_snap_px
-		else:
-			self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'])
-			self.check = self.check_plain
-			self.check_snap = self.check_snap_plain
 
 	def add_err(self, msg):
 		if msg is None:
@@ -79,68 +69,181 @@ class Check(object):
 			self.add_err('\tOn live (image: %s): %s' % (rbd, live))
 			self.add_err('\tOn backup (image: %s): %s' % (backup.dest, back))
 
-	def check_px(self):
-		pool = multiprocessing.Pool()
 
+class CheckProxmox(Check):
+	def __init__(self, cluster):
+		super().__init__(cluster)
+		self.px = Proxmox(cluster)
+
+	def check(self):
 		data = list()
 		for vm in self.px.vms():
 			for disk in vm['to_backup']:
 				ceph = self.px.ceph_storage[disk['ceph']]
-				backup = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
-				data.append({'ceph': ceph, 'backup': backup, 'image': disk['rbd']})
+				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
+				data.append({'ceph': ceph, 'backup': bck, 'image': disk['rbd']})
 
 		self.err = list()
-		for msg in pool.imap_unordered(self.check_img, data):
-			self.add_err(msg)
+		with multiprocessing.Pool() as pool:
+			for msg in pool.imap_unordered(self.check_img, data):
+				self.add_err(msg)
 
 		return self.err
 
-	def check_plain(self):
-		for rbd in self.ceph.ls():
-			backup = Bck(self.cluster['name'], self.ceph, rbd)
-			self.check_img(self.ceph, backup, rbd)
-		return self.err
-
-	def check_snap_px(self):
+	def check_snap(self):
 		for vm in self.px.vms():
 			for disk in vm['to_backup']:
 				ceph = self.px.ceph_storage[disk['ceph']]
-				backup = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
-				self.cmp_snap(backup, ceph, disk['rbd'])
-		return self.err
-
-	def check_snap_plain(self):
-		for rbd in self.ceph.ls():
-			backup = Bck(self.cluster['name'], self.ceph, rbd)
-			self.cmp_snap(backup, self.ceph, rbd)
+				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
+				self.cmp_snap(bck, ceph, disk['rbd'])
 		return self.err
 
 
-def dl_worker(snap):
-	try:
-		backup = snap['backup']
-		backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
-	except Exception as e:
-		Log.error(e)
-
-
-class Backup(object):
+class CheckPlain(Check):
 	def __init__(self, cluster):
-		self.cluster = cluster
-		if cluster['type'] == 'proxmox':
-			self.px()
-		else:
-			self.plain()
+		super().__init__(cluster)
+		self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'])
 
-	def __filter_vm(self, vms):
-		result = list()
-		for vm in vms:
-			if vm['smbios'] is None and self.cluster['use_smbios'] is True:
-				if config['uuid_fallback'] is False:
-					Log.warn('No smbios found, skipping')
-					continue
-			result.append(vm)
-		return result
+	def check(self):
+		for rbd in self.ceph.ls():
+			bck = Bck(self.cluster['name'], self.ceph, rbd)
+			self.check_img(self.ceph, bck, rbd)
+		return self.err
+
+	def check_snap(self):
+		for rbd in self.ceph.ls():
+			bck = Bck(self.cluster['name'], self.ceph, rbd)
+			self.cmp_snap(bck, self.ceph, rbd)
+		return self.err
+
+
+class Backup():
+	def __init__(self, cluster, queue):
+		self.cluster = cluster
+		self.queue = queue
+
+	def is_expired(snap, last=False):
+		splited = snap.split(';')
+		created_at = dateutil.parser.parse(splited[-1])
+		profile = splited[-3]
+		value = int(splited[-2])
+		if profile == 'daily':
+			expiration = datetime.timedelta(days=value)
+		elif profile == 'hourly':
+			expiration = datetime.timedelta(hours=value)
+		else:
+			Log.warn('Unknown profile found, no action taken: %s' % (profile,))
+			return False
+
+		expired_at = created_at + expiration
+		if last is True:
+			expired_at += datetime.timedelta(days=config['extra_retention_time'])
+
+		now = datetime.datetime.now()
+		if expired_at > now:
+			return False
+		return True
+
+	def _create_snap(self, bck, profiles):
+		for profile, value in profiles:
+			if not bck.check_profile(profile):
+				continue
+			dest, last_snap, snap_name = bck.make_snap(profile, value['count'])
+			if dest is not None:
+				queue.put({
+						'dest': dest,
+						'last_snap': last_snap,
+						'snap_name': snap_name,
+						'backup': bck,
+				})
+
+	def create_snaps(self):
+		items = self.list()
+		with multiprocessing.Pool(config['live_worker']) as pool:
+			for i in pool.imap_unordered(self.create_snap, items):
+				pass
+
+	def _expire_item(self, ceph, rbd):
+		snaps = ceph.snap(rbd)
+		try:
+			snaps.pop()  # We must never delete the latest snapshot
+		except IndexError:
+			# No snap found .. ?!
+			return
+
+		by_profile = {}
+		for snap in snaps:
+			tmp = snap.split(';')
+			if tmp[1] not in by_profile:
+				by_profile[tmp[1]] = list()
+			i = by_profile[tmp[1]]
+			i.append(snap)
+
+		to_del = list()
+		for profile, snaps in by_profile.items():
+			try:
+				profile = config['profiles'][profile]
+			except KeyError:
+				# Profile no longer exists, we can drop all these snaps
+				to_del += snaps
+				continue
+			try:
+				max_on_live = profile['max_on_live']
+			except KeyError:
+				max_on_live = 1
+
+			for _ in range(0, max_on_live):
+				try:
+					snaps.pop()
+				except IndexError:
+					# We do not have enough snaps on live
+					# snaps is now an empty list, nothing to delete
+					break
+
+			to_del += snaps
+		for i in to_del:
+			ceph.rm_snap(rbd, i)
+
+	def expire_live(self):
+		items = self.list()
+		with multiprocessing.Pool(config['live_worker']) as pool:
+			for i in pool.imap_unordered(self.expire_item, items):
+				pass
+
+	def expire_backup(i):
+		ceph = i['ceph']
+		image = i['image']
+
+		snaps = ceph.backup.snap(image)
+		try:
+			# Pop the last snapshot
+			# We will take care of it later
+			last = snaps.pop()
+		except IndexError:
+			# We found an image without snapshot
+			# Someone is messing around, or this is a bug
+			# Anyway, the image can be deleted
+			ceph.backup.rm(image)
+			return
+
+		for snap in snaps:
+			if not Backup.is_expired(snap):
+				continue
+			ceph.backup.rm_snap(image, snap)
+
+		snaps = ceph.backup.snap(image)
+		if len(snaps) == 1:
+			if Backup.is_expired(last, last=True):
+				ceph.backup.rm_snap(image, snaps[0])
+
+		if len(ceph.backup.snap(image)) == 0:
+			Log.info('%s has no snapshot left, deleting' % (image,))
+			ceph.backup.rm(image)
+
+
+class BackupProxmox(Backup):
+	def __init__(self, cluster, queue):
+		super().__init__(cluster, queue)
 
 	def __fetch_profiles(self, vm, disk):
 		profiles = list(config['profiles'].items())
@@ -173,15 +276,25 @@ class Backup(object):
 				profiles += list(add['profiles'].items())
 
 		except Exception as e:
-			Log.warn('Exception thrown while fetching more profiles for %s : %s' % (vm, e))
+			Log.warn('Exception thrown while fetching profiles for %s : %s' % (vm, e))
 		return profiles
 
-	def create_snaps(self, vm):
-		snaps = list()
-		try:
-			# Is the proxmoxer thread-safe ?
-			px = Proxmox(self.cluster)
+	def list(self):
+		px = Proxmox(self.cluster)
+		vms = px.vms()
 
+		result = list()
+		for vm in vms:
+			if vm['smbios'] is None and self.cluster['use_smbios'] is True:
+				if config['uuid_fallback'] is False:
+					Log.warn('No smbios found, skipping')
+					continue
+			result.append(vm)
+		return result
+
+	def create_snap(self, vm):
+		px = Proxmox(self.cluster)
+		try:
 			# We freeze the VM once, thus create all snaps at the same time
 			# Exports are done after thawing, because it it time-consuming,
 			# and we must not keep the VM frozen more than necessary
@@ -189,182 +302,107 @@ class Backup(object):
 
 			for disk in vm['to_backup']:
 				ceph = px.ceph_storage[disk['ceph']]
-				backup = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
+				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
 
 				profiles = self.__fetch_profiles(vm, disk)
-				for profile, value in profiles:
-					if not backup.check_profile(profile):
-						continue
-					dest, last_snap, snap_name = backup.make_snap(profile, value['count'])
-					if dest is not None:
-						snaps.append({
-								'dest': dest,
-								'last_snap': last_snap,
-								'snap_name': snap_name,
-								'backup': backup,
-						})
-			px.thaw(vm['node'], vm)
+				self._create_snap(bck, profiles)
 		except Exception as e:
 			Log.warn('create_snaps: %s thrown while processing %s' % (e, vm))
-		return snaps
 
-	def expire_live(self, vm):
 		try:
-			px = Proxmox(self.cluster)
-			for disk in vm['to_backup']:
-				ceph = px.ceph_storage[disk['ceph']]
-				backup = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm)
-				backup.expire_live()
-		except Exception as e:
-			Log.warn('Expire_live on %s : %s' % (vm, e))
+			px.thaw(vm['node'], vm)
+		except:
+			Log.warn('create_snaps: thaw failed while processing %s' % (vm,))
 
-	def px(self):
+	def expire_item(self, item):
 		px = Proxmox(self.cluster)
-		vms = px.vms()
-		vms = self.__filter_vm(vms)
-
-		pool = multiprocessing.Pool(config['snapshooter_processes'])
-		new_snaps = list()
-		for i in pool.imap_unordered(self.create_snaps, vms):
-			new_snaps += i
-		pool.close()
-		pool.join()
-
-		Log.info('I will now download %s snaps from px %s' % (len(new_snaps), self.cluster['name']))
-		truc = multiprocessing.get_context('spawn').Pool(config['download_worker'])
-		for i in truc.imap_unordered(dl_worker, new_snaps):
-			pass
-
-		pool = multiprocessing.Pool(config['snapshooter_processes'])
-		for i in pool.imap_unordered(self.expire_live, vms):
-			pass
-		pool.close()
-		pool.join()
-
-	def plain(self):
-		ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'])
-		for rbd in ceph.ls():
-			backup = Bck(self.cluster['name'], ceph, rbd)
-
-			for profile, value in config['profiles'].items():
-				if not backup.check_profile(profile):
-					continue
-				dest, last_snap, snap_name = backup.make_snap(profile, value['count'])
-				if dest is not None:
-					backup.dl_snap(snap_name, dest, last_snap)
-			backup.expire_live()
+		try:
+			for disk in item['to_backup']:
+				ceph = px.ceph_storage[disk['ceph']]
+				self._expire_item(ceph, disk['rbd'])
+		except Exception as e:
+			Log.warn('Expire_live on %s : %s' % (item, e))
 
 
-def is_expired(snap, last=False):
-	splited = snap.split(';')
-	created_at = dateutil.parser.parse(splited[-1])
-	profile = splited[-3]
-	value = int(splited[-2])
-	if profile == 'daily':
-		expiration = datetime.timedelta(days=value)
-	elif profile == 'hourly':
-		expiration = datetime.timedelta(hours=value)
-	else:
-		Log.warn('Unknown profile found, no action taken: %s' % (profile,))
-		return False
+class BackupPlain(Backup):
+	def __init__(self, cluster, queue):
+		super().__init__(cluster, queue)
+		self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'])
 
-	expired_at = created_at + expiration
-	if last is True:
-		expired_at += datetime.timedelta(days=config['extra_retention_time'])
+	def list(self):
+		return self.ceph.ls()
 
-	now = datetime.datetime.now()
-	if expired_at > now:
-		return False
-	return True
+	def create_snap(self, rbd):
+		bck = Bck(self.cluster['name'], self.ceph, rbd)
+		self._create_snap(bck, config['profiles'].items())
+
+	def expire_item(self, item):
+		try:
+			self._expire_item(self.ceph, item)
+		except Exception as e:
+			Log.warn('Expire_live on %s : %s' % (item, e))
 
 
-def expire_img(i):
-	ceph = i['ceph']
-	image = i['image']
+class Producer():
+	def __init__(self, queue):
+		self.queue = queue
 
-	snaps = ceph.backup.snap(image)
-	try:
-		# Pop the last snapshot
-		# We will take care of it later
-		last = snaps.pop()
-	except IndexError:
-		# We found an image without snapshot
-		# Someone is messing around, or this is a bug
-		# Anyway, the image can be deleted
-		ceph.backup.rm(image)
-		return
+	def __call__(self):
+		Log.debug('Producer started')
+		try:
+			self.__work__()
+		except Exception as e:
+			Log.error('Producer: %s' % (e,))
 
-	for snap in snaps:
-		if not is_expired(snap):
-			continue
-		ceph.backup.rm_snap(image, snap)
+		# We send one None per live_worker
+		# That way, all of them shall die
+		for i in range(0, config['live_worker']):
+			try:
+				self.queue.put(None)
+			except Exception as e:
+				Log.error('Producer: cannot end a live_worker! This is a critical bug, we will never die')
 
-	snaps = ceph.backup.snap(image)
-	if len(snaps) == 1:
-		if is_expired(last, last=True):
-			ceph.backup.rm_snap(image, snaps[0])
+		Log.debug('Producer ended')
 
-	if len(ceph.backup.snap(image)) == 0:
-		Log.info('%s has no snapshot left, deleting' % (image,))
-		ceph.backup.rm(image)
-
-
-def loop(args):
-	result = list()
-
-	for cluster in config['live_clusters']:
-		if args == 'backup':
+	def __work__(self):
+		for cluster in config['live_clusters']:
 			Log.info('Backuping %s: %s' % (cluster['type'], cluster['name']))
-			Backup(cluster)
-		else:
-			Log.info('Checking %s: %s' % (cluster['type'], cluster['name']))
-			check = Check(cluster)
-			if args == 'check':
-				ret = check.check()
+			if cluster['type'] == 'proxmox':
+				bidule = BackupProxmox(cluster, self.queue)
 			else:
-				ret = check.check_snap()
-			result += ret
-	if len(result) > 0:
-		for err in result:
-			Log.error(err)
-		Log.info('At the end, we failed: %s errors found' % (len(result),))
-		sys.exit(len(result))
+				bidule = BackupPlain(cluster, self.queue)
+			bidule.create_snaps()
 
 
-def bold(text):
-	return colored(text, attrs=['bold'])
+class Consumer():
+	def __init__(self, queue):
+		self.queue = queue
 
+	def __call__(self):
+		Log.debug('Consumer started')
+		try:
+			self.__work__()
+		except Exception as e:
+			Log.error('Consumer: %s' % (e,))
+		Log.debug('Consumer ended')
 
-def under(text):
-	return colored(text, attrs=['underline'])
+	def __work__(self):
+		while True:
+			snap = self.queue.get()
+			Log.debug(snap)
+			if snap is None:
+				break
 
-
-def usage():
-	me = bold(sys.argv[0])
-
-	rbd = under('rbd')
-	snap = '%s %s' % (rbd, under('snapshot'))
-	print('Usage:\t%s %s' % (me, bold('backup')))
-	print('\t%s %s' % (me, bold('check')))
-	print('\t%s %s' % (me, bold('check-snap')))
-	print('\t%s %s' % (me, bold('list-mapped')))
-	print('\t%s %s [%s]' % (me, bold('ls'), rbd))
-	print('\t%s %s %s' % (me, bold('map'), snap))
-	print('\t%s %s %s' % (me, bold('unmap'), snap))
-	exit(1)
-
-
-def Pt(header):
-	header = [bold(i) for i in header]
-	pt = PrettyTable(header)
-	pt.align = 'l'
-	pt.padding_width = 2
-	return pt
+			try:
+				backup = snap['backup']
+				backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
+			except Exception as e:
+				Log.error(e)
 
 
 if __name__ == '__main__':
 	if len(sys.argv) < 2:
-		usage()
+		pretty.usage()
 
 	try:
 		action = sys.argv[1]
@@ -375,22 +413,71 @@ if __name__ == '__main__':
 	if action not in ('backup', 'check', 'check-snap', 'ls', 'list-mapped',
 			'map', 'unmap'):
 		Log.error('Action %s unknown' % (action,))
-		usage()
+		pretty.usage()
 
-	if action in ('backup', 'check', 'check-snap'):
-		loop(action)
-		if action != 'backup':
-			exit(0)
+	if action in ('check', 'check-snap'):
+		result = list()
+
+		for cluster in config['live_clusters']:
+			Log.info('Checking %s: %s' % (cluster['type'], cluster['name']))
+			if cluster['type'] == 'proxmox':
+				check = CheckProxmox(cluster)
+			else:
+				check = CheckPlain(cluster)
+			if action == 'check':
+				ret = check.check()
+			else:
+				ret = check.check_snap()
+			result += ret
+
+		if len(result) > 0:
+			for err in result:
+				Log.error(err)
+			Log.info('At the end, we failed: %s errors found' % (len(result),))
+		exit(len(result))
+
+	if action == 'backup':
+		Log.info('Starting backup ..')
+
+		manager = multiprocessing.Manager()
+		atexit.register(manager.shutdown)
+		queue = manager.Queue()
+		producer = multiprocessing.Process(target=Producer(queue))
+		atexit.register(producer.terminate)
+		producer.start()
+
+		live_workers = list()
+		for i in range(0, config['live_worker']):
+			pid = multiprocessing.Process(target=Consumer(queue))
+			atexit.register(pid.terminate)
+			live_workers.append(pid)
+			pid.start()
+
+		# Workers will exit upon a None reception
+		# When all of them are done, we are done
+		for pid in live_workers:
+			pid.join()
+
+		manager.shutdown()
+
+		for cluster in config['live_clusters']:
+			Log.info('Expire snapshots from live %s: %s' % (cluster['type'], cluster['name']))
+			if cluster['type'] == 'proxmox':
+				bidule = BackupProxmox(cluster, None)
+			else:
+				bidule = BackupPlain(cluster, None)
+			bidule.expire_live()
+
 		Log.info('Expiring our snapshots')
 		# Dummy Ceph object used to retrieve the real backup Object
 		ceph = Ceph(None)
 
-		pool = multiprocessing.Pool(config['expire_processes'])
 		data = list()
 		for i in ceph.backup.ls():
 			data.append({'ceph': ceph, 'image': i})
-		for i in pool.imap_unordered(expire_img, data):
-			pass
+		with multiprocessing.Pool(config['backup_worker']) as pool:
+			for i in pool.imap_unordered(Backup.expire_backup, data):
+				pass
 		exit(0)
 
 	try:
@@ -407,13 +494,13 @@ if __name__ == '__main__':
 	if action == 'ls':
 		data = restore.ls()
 		if rbd is None:
-			pt = Pt(['Ident', 'Disk', 'UUID'])
+			pt = pretty.Pt(['Ident', 'Disk', 'UUID'])
 
 			for i in data:
 				row = [i['ident'], i['disk'], i['uuid']]
 				pt.add_row(row)
 		else:
-			pt = Pt(['Creation date', 'UUID'])
+			pt = pretty.Pt(['Creation date', 'UUID'])
 
 			for i in data:
 				row = [i['creation'], i['uuid']]
@@ -421,15 +508,15 @@ if __name__ == '__main__':
 		print(pt)
 	elif action == 'list-mapped':
 		data = restore.list_mapped()
-		pt = Pt(['rbd', 'snap', 'mount'])
+		pt = pretty.Pt(['rbd', 'snap', 'mount'])
 		for i in data:
 			pt.add_row([i['parent_image'], i['parent_snap'], i['mountpoint']])
 		print(pt)
 	elif action == 'map':
 		if rbd is None or snap is None:
-			usage()
+			pretty.usage()
 		restore.mount()
 	elif action == 'unmap':
 		if rbd is None or snap is None:
-			usage()
+			pretty.usage()
 		restore.umount()

@@ -1,5 +1,6 @@
 import collections
 import importlib.util
+import os
 
 
 # Random code from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9
@@ -35,14 +36,13 @@ def load_config():
 		'live_clusters': [],
 		'extra_retention_time': 0,
 		'ceph_endpoint': {},
-		'download_worker': 12,
 		'download_compression': False,
 		'fsfreeze': True,
 		'uuid_fallback': True,
 		'pretty_colors': True,
 		'log_level': 'debug',
-		'expire_processes': 24,
-		'snapshooter_processes': 10,
+		'backup_worker': 24,
+		'live_worker': 12,
 		'hash_binary': '/usr/bin/md5sum',
 	}
 

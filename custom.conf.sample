@@ -103,10 +103,6 @@ config = {
 	#	}
 	#},
 
-	# How many worker should I use to download the
-	# backups ?
-	#'download_worker': 12,
-
 	# If set to True, snapshots are compressed during transfert
 	# Usefull if you have a low bandwith
 	#'download_compression': False,
@@ -135,15 +131,13 @@ config = {
 	# Can be any of 'debug', 'info', 'warn', 'err'
 	#'log_level': 'debug',
 
-	# We can parallelize old backup expiration
-	# The more process we use, the more pressure is made on the
-	# backup cluster, IO wise
-	#'expire_processes': 24,
+	# How many workers should be used when we parallelize
+	# tasks on the backup cluster
+	#'backup_worker': 24,
 
-	# We can parallelize the snapshot creation
-	# This is roughly the same setting as 'expire_processes',
-	# except that it impact the live cluster
-	#'snapshooter_processes': 10,
+	# How many workers should be used when we parallelize
+	# tasks on the live cluster
+	#'live_worker': 12,
 
 	# Hash binary used to compare snapshots
 	# You can you any executable that meet the follow requirements:
