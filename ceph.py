@@ -85,7 +85,7 @@ class Ceph():
 		result = []
 		rbd_nbd = sh.Command('rbd-nbd')
 		for mapped in rbd_nbd('list-mapped'):
-			if mapped.startswith('pid'):
+			if mapped.startswith('pid') or mapped.startswith('id'):
 				continue
 			mapped = mapped.split(' ')
 			mapped = [i for i in mapped if i != '']
