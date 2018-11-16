@@ -153,4 +153,9 @@ config = {
 	# This executable must live on every Ceph cluster, as well as the backup
 	# node, because hash is done remotely
 	#'hash_binary': 'md5sum',
+
+	# Sqlite3 database used to track "failed" backups
+	# We have to make the diff between a failed backup, and a missing backup
+	# (some newly created disk not yet backed up)
+	#'check_db': '/tmp/backurne.db',
 }

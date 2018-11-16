@@ -44,6 +44,7 @@ def load_config():
 		'backup_worker': 24,
 		'live_worker': 12,
 		'hash_binary': '/usr/bin/md5sum',
+		'check_db': '/tmp/backurne.db',
 	}
 
 	for custom in ('custom.conf',):

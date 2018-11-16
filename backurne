@@ -5,6 +5,7 @@ import datetime
 import dateutil.parser
 import multiprocessing
 import requests
+import sqlite3
 import sys
 
 import pretty
@@ -25,7 +26,6 @@ class Check():
 		if msg is None:
 			return
 		msg['cluster'] = self.cluster['name']
-		msg['msg'] = '%s: %s' % (self.cluster['name'], msg['msg'])
 		self.err.append(msg)
 
 	def check_img(self, args):
@@ -401,6 +401,55 @@ class Consumer():
 				Log.error(e)
 
 
+def get_sqlite():
+	sql = sqlite3.connect(config['check_db'], isolation_level=None)
+	sql.execute('create table if not exists results (date text, cluster text, disk text, msg text)')
+	return sql
+
+
+def print_check_results():
+	sql = get_sqlite()
+
+	failed = sql.execute('select * from results where date < strftime("%s", "now") - 3600 * 30')
+	failed = [i for i in failed]
+
+	if len(failed) > 0:
+		Log.info('Backurne error: %s failed backups found' % (len(failed),))
+		for err in failed:
+			Log.error(err[3])
+		exit(2)
+	exit(0)
+
+
+def update_check_results(check_results):
+	sql = get_sqlite()
+
+	failed_db = [i for i in sql.execute('select date, cluster, disk from results')]
+	for i in failed_db:
+		found = False
+		for j in check_results:
+			if i[1] != j['cluster']:
+				continue
+			if i[2] != j['image']:
+				continue
+			found = True
+			break
+		if found is False:
+			sql.execute('delete from results where cluster = ? and disk = ?', (i[1], i[2]))
+
+	for i in check_results:
+		found = False
+		for j in failed_db:
+			if j[1] != i['cluster']:
+				continue
+			if j[2] != i['image']:
+				continue
+			found = True
+			break
+		if found is False:
+			sql.execute('insert into results values(strftime("%s", "now"), ?, ?, ?)', (i['cluster'], i['image'], i['msg']))
+
+
 if __name__ == '__main__':
 	if len(sys.argv) < 2:
 		pretty.usage()
@@ -411,12 +460,15 @@ if __name__ == '__main__':
 		Log.warn('nothing to do')
 		exit(1)
 
-	if action not in ('backup', 'check', 'check-snap', 'ls', 'list-mapped',
+	if action not in ('backup', 'precheck', 'check', 'check-snap', 'ls', 'list-mapped',
 			'map', 'unmap'):
 		Log.error('Action %s unknown' % (action,))
 		pretty.usage()
 
-	if action in ('check', 'check-snap'):
+	if action == 'check':
+		print_check_results()
+
+	if action in ('precheck', 'check-snap'):
 		result = list()
 
 		for cluster in config['live_clusters']:
@@ -425,17 +477,14 @@ if __name__ == '__main__':
 				check = CheckProxmox(cluster)
 			else:
 				check = CheckPlain(cluster)
-			if action == 'check':
+			if action == 'precheck':
 				ret = check.check()
 			else:
 				ret = check.check_snap()
 			result += ret
 
-		if len(result) > 0:
-			for err in result:
-				Log.error(err['msg'])
-			Log.info('At the end, we failed: %s errors found' % (len(result),))
-		exit(len(result))
+		update_check_results(result)
+		print_check_results()
 
 	if action == 'backup':
 		Log.info('Starting backup ..')
