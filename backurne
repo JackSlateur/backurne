@@ -414,10 +414,12 @@ def print_check_results():
 	failed = [i for i in failed]
 
 	if len(failed) > 0:
-		Log.info('Backurne error: %s failed backups found' % (len(failed),))
+		print('Error: %s failed backup found' % (len(failed),))
 		for err in failed:
-			Log.error(err[3])
+			print(err[3])
 		exit(2)
+
+	print('OK: all things are backed up!')
 	exit(0)
 
 
