@@ -24,7 +24,8 @@ class Check():
 	def add_err(self, msg):
 		if msg is None:
 			return
-		msg = '%s: %s' % (self.cluster['name'], msg)
+		msg['cluster'] = self.cluster['name']
+		msg['msg'] = '%s: %s' % (self.cluster['name'], msg['msg'])
 		self.err.append(msg)
 
 	def check_img(self, args):
@@ -35,12 +36,12 @@ class Check():
 
 			if not ceph.backup.exists(backup.dest):
 				msg = 'No backup found for %s (image does not exists)' % (rbd,)
-				return msg
+				return {'image': rbd, 'msg': msg}
 
 			last = ceph.get_last_shared_snap(rbd, backup.dest)
 			if last is None:
 				msg = 'No backup found for %s (no shared snap)' % (rbd,)
-				return msg
+				return {'image': rbd, 'msg': msg}
 
 			when = last.split(';')[3]
 			when = dateutil.parser.parse(when)
@@ -48,7 +49,7 @@ class Check():
 			deadline = datetime.datetime.now() - deadline
 			if when < deadline:
 				msg = 'Backup found for %s, yet too old (created at %s)' % (rbd, when)
-				return msg
+				return {'image': rbd, 'msg': msg}
 		except Exception as e:
 			Log.warn('Exception thrown while checking %s : %s' % (args, e))
 
@@ -432,7 +433,7 @@ if __name__ == '__main__':
 
 		if len(result) > 0:
 			for err in result:
-				Log.error(err)
+				Log.error(err['msg'])
 			Log.info('At the end, we failed: %s errors found' % (len(result),))
 		exit(len(result))
 
