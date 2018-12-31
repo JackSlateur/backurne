@@ -410,11 +410,11 @@ def get_sqlite():
 def print_check_results():
 	sql = get_sqlite()
 
-	failed = sql.execute('select * from results where date < strftime("%s", "now") - 3600 * 30')
+	failed = sql.execute('select * from results where date < strftime("%s", "now") - 7200')
 	failed = [i for i in failed]
 
 	if len(failed) > 0:
-		print('Error: %s failed backup found' % (len(failed),))
+		print('Error: %s failed backups found' % (len(failed),))
 		for err in failed:
 			print(err[3])
 		exit(2)
