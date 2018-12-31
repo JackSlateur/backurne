@@ -41,7 +41,12 @@ class Proxmox():
 		return [i['node'] for i in nodes]
 
 	def vms(self):
-		vms = [vm for node in self.nodes() for vm in self.list_qemu(node)]
+		vms = list()
+		for node in self.nodes():
+			try:
+				vms += self.list_qemu(node)
+			except Exception as e:
+				Log.error('Cannot list VMs on node %s: error %s received' % (node, e))
 		return vms
 
 	def get_smbios(self, conf):
