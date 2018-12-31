@@ -16,13 +16,13 @@ def usage():
 
 	rbd = under('rbd')
 	snap = '%s %s' % (rbd, under('snapshot'))
-	print('Usage:\t%s %s' % (me, bold('backup')))
-	print('\t%s %s' % (me, bold('check')))
-	print('\t%s %s' % (me, bold('check-snap')))
-	print('\t%s %s' % (me, bold('list-mapped')))
-	print('\t%s %s [%s]' % (me, bold('ls'), rbd))
-	print('\t%s %s %s' % (me, bold('map'), snap))
-	print('\t%s %s %s' % (me, bold('unmap'), snap))
+	sys.stderr.write('Usage:\t%s %s\n' % (me, bold('backup')))
+	sys.stderr.write('\t%s %s\n' % (me, bold('check')))
+	sys.stderr.write('\t%s %s\n' % (me, bold('check-snap')))
+	sys.stderr.write('\t%s %s\n' % (me, bold('list-mapped')))
+	sys.stderr.write('\t%s %s [%s]\n' % (me, bold('ls'), rbd))
+	sys.stderr.write('\t%s %s %s\n' % (me, bold('map'), snap))
+	sys.stderr.write('\t%s %s %s\n' % (me, bold('unmap'), snap))
 	exit(1)
 
 
