@@ -1,0 +1,63 @@
+_backurne() 
+{
+	local cur prev opts
+	COMPREPLY=()
+	cur="${COMP_WORDS[COMP_CWORD]}"
+	prev="${COMP_WORDS[COMP_CWORD-1]}"
+	subcmd="${COMP_WORDS[1]}"
+
+	if [ "$prev" == "backurne" ]
+	then
+		opts="backup check check-snap list-mapped ls map unmap"
+		COMPREPLY=($(compgen -W "$opts" -- ${cur}))
+		return 0
+	fi
+
+	if [ "$subcmd" == "unmap" ]
+	then
+		if [ "$prev" == "unmap" ]
+		then
+			opts="$(backurne list-mapped --json | jq -r .[].parent_image)"
+		else
+			prev=$(echo $prev | tr -d '\\')
+			opts="$(backurne list-mapped --json | jq -r ".[] | select(.parent_image | contains(\"$prev\")) | .parent_snap")"
+		fi
+		COMPREPLY=($(compgen -W "$opts" -- ${cur}))
+		return 0
+	fi
+
+	if [ "$subcmd" == "ls" ]
+	then
+		if [ "$cur" == "" ]
+		then
+			opts="$(backurne ls --json | jq -r .[].uuid)"
+			COMPREPLY=($(compgen -W "$opts" -- ${cur}))
+		else
+			opts="$(backurne ls --json | jq -r .[].uuid | grep $cur)"
+			COMPREPLY=($opts $(compgen -W "$opts" -- ${cur}))
+		fi
+		return 0
+	fi
+
+	if [ "$subcmd" == "map" ]
+	then
+		if [ "$prev" == "map" ]
+		then
+			if [ "$cur" == "" ]
+			then
+				opts="$(backurne ls --json | jq -r .[].uuid)"
+				COMPREPLY=($(compgen -W "$opts" -- ${cur}))
+			else
+				opts="$(backurne ls --json | jq -r .[].uuid | grep $cur)"
+				COMPREPLY=($opts $(compgen -W "$opts" -- ${cur}))
+			fi
+		else
+			prev=$(echo $prev | tr -d '\\')
+			opts="$(backurne ls --json $prev | jq -r .[].uuid)"
+			COMPREPLY=($(compgen -W "$opts" -- ${cur}))
+		fi
+		return 0
+	fi
+}
+
+command -v jq && complete -o filenames -F _backurne backurne

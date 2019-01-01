@@ -29,7 +29,8 @@ Required packages
 
 Core: python3-dateutil, python3-termcolor, python3-prettytable, python3-requests, python3-proxmoxer (from https://github.com/swayf/proxmoxer) \
 For mapping (optional): kpartx, rbd-nbd (luminous or later)\
-For the REST API: python3-flask, python3-flask-autoindex
+For the REST API: python3-flask, python3-flask-autoindex\
+For bash autocompletion: jq
 
 
 Installation
