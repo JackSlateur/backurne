@@ -3,6 +3,7 @@
 import atexit
 import datetime
 import dateutil.parser
+import json
 import multiprocessing
 import requests
 import sqlite3
@@ -462,6 +463,12 @@ if __name__ == '__main__':
 		Log.warn('nothing to do')
 		exit(1)
 
+	if '--json' in sys.argv:
+		json_format = True
+		sys.argv.remove('--json')
+	else:
+		json_format = False
+
 	if action not in ('backup', 'precheck', 'check', 'check-snap', 'ls', 'list-mapped',
 			'map', 'unmap'):
 		Log.error('Action %s unknown' % (action,))
@@ -557,13 +564,21 @@ if __name__ == '__main__':
 			for i in data:
 				row = [i['creation'], i['uuid']]
 				pt.add_row(row)
-		print(pt)
+
+		if json_format is True:
+			print(json.dumps(data, default=str))
+		else:
+			print(pt)
 	elif action == 'list-mapped':
 		data = restore.list_mapped()
 		pt = pretty.Pt(['rbd', 'snap', 'mount'])
 		for i in data:
 			pt.add_row([i['parent_image'], i['parent_snap'], i['mountpoint']])
-		print(pt)
+
+		if json_format is True:
+			print(json.dumps(data))
+		else:
+			print(pt)
 	elif action == 'map':
 		if rbd is None or snap is None:
 			pretty.usage()
