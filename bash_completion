@@ -1,5 +1,4 @@
-_backurne() 
-{
+_backurne(){
 	local cur prev opts
 	COMPREPLY=()
 	cur="${COMP_WORDS[COMP_CWORD]}"
