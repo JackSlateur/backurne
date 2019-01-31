@@ -42,11 +42,21 @@ class Proxmox():
 
 	def vms(self):
 		vms = list()
-		for node in self.nodes():
-			try:
-				vms += self.list_qemu(node)
-			except Exception as e:
-				Log.error('Cannot list VMs on node %s: error %s received' % (node, e))
+		for vm in self.px.cluster.resources.get(type='vm'):
+			self.vmid = vm['vmid']
+			vm['px'] = self
+			vm['config'] = self.px.nodes(vm['node']).qemu(vm['vmid']).pending.get()
+			tmp = {}
+			for i in vm['config']:
+				if 'value' not in i:
+					continue
+				tmp[i['key']] = i['value']
+			vm['config'] = tmp
+			vm['smbios'] = self.get_smbios(vm['config'])
+			vm['to_backup'] = self.get_disks(vm['config'])
+			if 'agent' in vm['config']:
+				vm['qemu_agent'] = vm['config']['agent']
+			vms.append(vm)
 		return vms
 
 	def get_smbios(self, conf):
@@ -100,21 +110,6 @@ class Proxmox():
 				continue
 			result.append({'ceph': storage, 'rbd': volume, 'adapter': adapter})
 		return result
-
-	def list_qemu(self, name):
-		node = self.px.nodes(name)
-
-		qemu = node.qemu.get()
-		for i in qemu:
-			self.vmid = i['vmid']
-			i['px'] = self
-			i['node'] = name
-			i['config'] = node.qemu(i['vmid']).config.get()
-			i['smbios'] = self.get_smbios(i['config'])
-			i['to_backup'] = self.get_disks(i['config'])
-			if 'agent' in i['config']:
-				i['qemu_agent'] = i['config']['agent']
-		return qemu
 
 	def is_running(self, qemu):
 		status = qemu.status.get('current')['status']
