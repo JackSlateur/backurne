@@ -135,7 +135,7 @@ class Ceph():
 		sh.Command('rbd-nbd')('unmap', dev)
 
 	def rm(self, image):
-		Log.info('Deleting %s ..' % (image,))
+		Log.info('Deleting image %s ..' % (image,))
 		try:
 			self('rm', image)
 		except:
