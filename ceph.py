@@ -135,14 +135,14 @@ class Ceph():
 		sh.Command('rbd-nbd')('unmap', dev)
 
 	def rm(self, image):
-		Log.info('Deleting %s ..' % (image,))
+		Log.info('Deleting image %s ..' % (image,))
 		try:
 			self('rm', image)
 		except:
 			Log.debug('%s cannot be removed, maybe someone mapped it' % (image,))
 
 	def rm_snap(self, image, snap):
-		Log.info('Deleting %s@%s .. ' % (image, snap))
+		Log.info('Deleting snapshot %s@%s .. ' % (image, snap))
 		snap = self.__esc(snap)
 		try:
 			self('snap', 'rm', '--snap', snap, image)
@@ -151,6 +151,8 @@ class Ceph():
 
 	def mk_snap(self, image, snap, vm=None):
 		snap = self.__esc(snap)
+
+		Log.info('Creating snapshot %s@%s .. ' % (image, snap))
 
 		if vm is None:
 			self('snap', 'create', '--snap', snap, image)
