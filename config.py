@@ -45,6 +45,7 @@ def load_config():
 		'live_worker': 12,
 		'hash_binary': '/usr/bin/md5sum',
 		'check_db': '/tmp/backurne.db',
+		'lockdir': '/var/lock/backurne',
 	}
 
 	for custom in ('custom.conf',):
@@ -61,6 +62,9 @@ def load_config():
 	if ';' in prefix or ';' in prefix:
 		print('''fatal: "'" or " " found in snap_prefix (%s)''' % (prefix,))
 		exit(1)
+
+	if not os.path.exists(config['lockdir']):
+		os.makedirs(config['lockdir'])
 
 	return config
 

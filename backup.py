@@ -15,13 +15,13 @@ class Bck():
 
 		self.source = '%s:%s' % (self.name, self.rbd)
 
-		self.dest = self.__build_dest()
+		self.dest = self.build_dest()
 
 		# Store here the last snapshot created via this object
 		# It is not yet on the backup cluster
 		self.last_created_snap = None
 
-	def __build_dest(self):
+	def build_dest(self):
 		ident = self.name
 		comment = None
 

@@ -3,6 +3,7 @@
 import atexit
 import datetime
 import dateutil.parser
+import filelock
 import json
 import multiprocessing
 import requests
@@ -151,20 +152,25 @@ class Backup():
 
 	def _create_snap(self, bck, profiles):
 		todo = list()
+		filename = bck.build_dest().replace('/', '')
+		filename = '%s/%s' % (config['lockdir'], filename)
+		Log.debug('Producer: locking %s' % (filename,))
+		lock = filelock.FileLock(filename, timeout=0)
 
-		for profile, value in profiles:
-			if not bck.check_profile(profile):
-				continue
+		with lock:
+			for profile, value in profiles:
+				if not bck.check_profile(profile):
+					continue
 
-			dest, last_snap, snap_name = bck.make_snap(profile, value['count'])
-			if dest is not None:
-				todo.append({
+				dest, last_snap, snap_name = bck.make_snap(profile, value['count'])
+				if dest is not None:
+					todo.append({
 						'dest': dest,
 						'last_snap': last_snap,
 						'snap_name': snap_name,
 						'backup': bck,
-				})
-
+					})
+		Log.debug('Producer: releasing lock %s' % (filename,))
 		if len(todo) != 0:
 			queue.put(todo)
 
@@ -176,20 +182,31 @@ class Backup():
 
 	def _expire_item(self, ceph, disk, vm=None):
 		if vm is not None:
+			bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
 			rbd = disk['rbd']
 		else:
+			bck = Bck(self.cluster['name'], ceph, disk)
 			rbd = disk
 
+		bck.build_dest()
+
+		backups = Ceph(None).backup.snap(bck.build_dest())
+
 		snaps = ceph.snap(rbd)
+		shared = list(set(backups).intersection(snaps))
 
 		try:
-			snaps.pop()  # We must never delete the latest snapshot
+			shared = sorted(shared).pop()
 		except IndexError:
-			# No snap found .. ?!
-			return
+			shared = None
 
 		by_profile = {}
 		for snap in snaps:
+			# The last shared snapshot must be kept
+			# Also, subsequent snaps shall be kept as well,
+			# because a backup may be pending elsewhere
+			if snap >= shared:
+				continue
 			tmp = snap.split(';')
 			if tmp[1] not in by_profile:
 				by_profile[tmp[1]] = list()
@@ -231,31 +248,42 @@ class Backup():
 		ceph = i['ceph']
 		image = i['image']
 
-		snaps = ceph.backup.snap(image)
+		filename = image.replace('/', '')
+		filename = '%s/%s' % (config['lockdir'], filename)
+		Log.debug('Expire_backup: locking %s' % (filename,))
+		lock = filelock.FileLock(filename, timeout=0)
+
 		try:
-			# Pop the last snapshot
-			# We will take care of it later
-			last = snaps.pop()
-		except IndexError:
-			# We found an image without snapshot
-			# Someone is messing around, or this is a bug
-			# Anyway, the image can be deleted
-			ceph.backup.rm(image)
-			return
+			with lock:
+				snaps = ceph.backup.snap(image)
+				try:
+					# Pop the last snapshot
+					# We will take care of it later
+					last = snaps.pop()
+				except IndexError:
+					# We found an image without snapshot
+					# Someone is messing around, or this is a bug
+					# Anyway, the image can be deleted
+					ceph.backup.rm(image)
+					Log.debug('Expire_backup: releasing lock %s' % (filename,))
+					return
 
-		for snap in snaps:
-			if not Backup.is_expired(snap):
-				continue
-			ceph.backup.rm_snap(image, snap)
+				for snap in snaps:
+					if not Backup.is_expired(snap):
+						continue
+					ceph.backup.rm_snap(image, snap)
 
-		snaps = ceph.backup.snap(image)
-		if len(snaps) == 1:
-			if Backup.is_expired(last, last=True):
-				ceph.backup.rm_snap(image, snaps[0])
+				snaps = ceph.backup.snap(image)
+				if len(snaps) == 1:
+					if Backup.is_expired(last, last=True):
+						ceph.backup.rm_snap(image, snaps[0])
 
-		if len(ceph.backup.snap(image)) == 0:
-			Log.info('%s has no snapshot left, deleting' % (image,))
-			ceph.backup.rm(image)
+				if len(ceph.backup.snap(image)) == 0:
+					Log.info('%s has no snapshot left, deleting' % (image,))
+					ceph.backup.rm(image)
+			Log.debug('Expire_backup: releasing lock %s' % (filename,))
+		except filelock.Timeout as e:
+			Log.warn(e)
 
 
 class BackupProxmox(Backup):
@@ -320,7 +348,6 @@ class BackupProxmox(Backup):
 			for disk in vm['to_backup']:
 				ceph = px.ceph_storage[disk['ceph']]
 				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
-
 				profiles = self.__fetch_profiles(vm, disk)
 				self._create_snap(bck, profiles)
 		except Exception as e:
@@ -336,7 +363,15 @@ class BackupProxmox(Backup):
 		try:
 			for disk in vm['to_backup']:
 				ceph = px.ceph_storage[disk['ceph']]
-				self._expire_item(ceph, disk, vm)
+				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
+				filename = bck.build_dest().replace('/', '')
+				filename = '%s/%s' % (config['lockdir'], filename)
+				Log.debug('expire_item: locking %s' % (filename,))
+				lock = filelock.FileLock(filename, timeout=0)
+
+				with lock:
+					self._expire_item(ceph, disk, vm)
+				Log.debug('expire_item: releasing %s' % (filename,))
 		except Exception as e:
 			Log.warn('Expire_live on %s : %s' % (vm, e))
 
@@ -409,12 +444,20 @@ class Consumer():
 			if snaps is None:
 				break
 
+			filename = snaps[0]['dest'].replace('/', '')
+			filename = '%s/%s' % (config['lockdir'], filename)
+			lock = filelock.FileLock(filename, timeout=0)
 			try:
-				for snap in snaps:
-					backup = snap['backup']
-					backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
+				Log.debug('Consumer: locking %s' % (filename,))
+				with lock:
+					for snap in snaps:
+						backup = snap['backup']
+						backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
+			except filelock.Timeout as e:
+				Log.debug(e)
 			except Exception as e:
 				Log.error(e)
+			Log.debug('Consumer: releasing %s' % (filename,))
 
 
 def get_sqlite():
