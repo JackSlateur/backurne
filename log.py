@@ -7,18 +7,22 @@ from config import config
 
 class ConsoleFormatter(logging.Formatter):
 	def format(self, record):
-		err = colored('  CRIT:  ', 'red')
-		warn = colored('  WARN:  ', 'yellow')
-		info = colored('  INFO:  ', 'green')
-		debug = colored('  DEBUG: ', 'green')
-		if record.levelno == logging.ERROR:
-			record.msg = '%s%s' % (err, record.msg)
-		if record.levelno == logging.WARNING:
-			record.msg = '%s%s' % (warn, record.msg)
-		if record.levelno == logging.INFO:
-			record.msg = '%s%s' % (info, record.msg)
 		if record.levelno == logging.DEBUG:
-			record.msg = '%s%s' % (debug, record.msg)
+			msg = '[%s:%s:%s()] %s' % (record.filename, record.lineno, record.funcName, record.msg)
+		else:
+			msg = record.msg
+		if record.levelno == logging.ERROR:
+			front = colored('  CRIT:  ', 'red')
+		if record.levelno == logging.WARNING:
+			front = colored('  WARN:  ', 'yellow')
+		if record.levelno == logging.INFO:
+			front = colored('  INFO:  ', 'green')
+		if record.levelno == logging.DEBUG:
+			front = colored('  DEBUG: ', 'green')
+
+		msg = '%s%s' % (front, msg)
+
+		record.msg = msg
 
 		return logging.Formatter.format(self, record)
 
@@ -26,7 +30,7 @@ class ConsoleFormatter(logging.Formatter):
 log = logging.getLogger('backurne')
 
 syslog = logging.handlers.SysLogHandler(address='/dev/log')
-detailed_formatter = logging.Formatter('%(name)s[%(process)d]: %(levelname)s: %(message)s')
+detailed_formatter = logging.Formatter('%(name)s[%(process)d]: %(levelname)s: [%(filename)s:%(lineno)s:%(funcName)s()] %(message)s')
 syslog.setFormatter(detailed_formatter)
 log.addHandler(syslog)
 
