@@ -150,17 +150,23 @@ class Backup():
 		return True
 
 	def _create_snap(self, bck, profiles):
+		todo = list()
+
 		for profile, value in profiles:
 			if not bck.check_profile(profile):
 				continue
+
 			dest, last_snap, snap_name = bck.make_snap(profile, value['count'])
 			if dest is not None:
-				queue.put({
+				todo.append({
 						'dest': dest,
 						'last_snap': last_snap,
 						'snap_name': snap_name,
 						'backup': bck,
 				})
+
+		if len(todo) != 0:
+			queue.put(todo)
 
 	def create_snaps(self):
 		items = self.list()
@@ -393,14 +399,14 @@ class Consumer():
 
 	def __work__(self):
 		while True:
-			snap = self.queue.get()
-			Log.debug(snap)
-			if snap is None:
+			snaps = self.queue.get()
+			if snaps is None:
 				break
 
 			try:
-				backup = snap['backup']
-				backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
+				for snap in snaps:
+					backup = snap['backup']
+					backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
 			except Exception as e:
 				Log.error(e)
 
