@@ -174,8 +174,14 @@ class Backup():
 			for i in pool.imap_unordered(self.create_snap, items):
 				pass
 
-	def _expire_item(self, ceph, rbd):
+	def _expire_item(self, ceph, disk, vm=None):
+		if vm is not None:
+			rbd = disk['rbd']
+		else:
+			rbd = disk
+
 		snaps = ceph.snap(rbd)
+
 		try:
 			snaps.pop()  # We must never delete the latest snapshot
 		except IndexError:
@@ -325,14 +331,14 @@ class BackupProxmox(Backup):
 		except:
 			Log.warn('create_snaps: thaw failed while processing %s' % (vm,))
 
-	def expire_item(self, item):
+	def expire_item(self, vm):
 		px = Proxmox(self.cluster)
 		try:
-			for disk in item['to_backup']:
+			for disk in vm['to_backup']:
 				ceph = px.ceph_storage[disk['ceph']]
-				self._expire_item(ceph, disk['rbd'])
+				self._expire_item(ceph, disk, vm)
 		except Exception as e:
-			Log.warn('Expire_live on %s : %s' % (item, e))
+			Log.warn('Expire_live on %s : %s' % (vm, e))
 
 
 class BackupPlain(Backup):
