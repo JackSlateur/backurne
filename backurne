@@ -62,14 +62,17 @@ class Check():
 			backup_snaps = []
 		inter = list(set(live_snaps).intersection(backup_snaps))
 		for snap in inter:
+			Log.debug('checking %s @ %s' % (rbd, snap))
 			live = ceph.checksum(rbd, snap)
 			back = ceph.backup.checksum(backup.dest, snap)
 			if live == back:
 				continue
 
-			self.add_err('ERR: shared snapshot %s does not match' % (snap,))
-			self.add_err('\tOn live (image: %s): %s' % (rbd, live))
-			self.add_err('\tOn backup (image: %s): %s' % (backup.dest, back))
+			err = {
+				'image': rbd,
+				'msg': 'ERR: shared snapshot %s does not match\n\tOn live (image: %s): %s\n\tOn backup (image: %s): %s' % (snap, rbd, live, backup.dest, back),
+			}
+			self.add_err(err)
 
 
 class CheckProxmox(Check):

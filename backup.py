@@ -77,7 +77,7 @@ class Bck():
 			last_time = last_profile.split(';')[3]
 			last_time = dateutil.parser.parse(last_time)
 			if last_time > not_after:
-				Log.info('Our last backup is still young, nothing to do')
+				Log.debug('Our last backup is still young, nothing to do')
 				return False
 		return True
 
