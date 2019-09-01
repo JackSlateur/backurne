@@ -1,6 +1,6 @@
 import collections
-import importlib.util
 import os
+import imp
 
 
 # Random code from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9
@@ -15,16 +15,6 @@ def dict_merge(dct, merge_dct):
 
 
 def load_config():
-	def load(path):
-		source = importlib.machinery.SourceFileLoader('custom', path)
-		spec = importlib.util.spec_from_loader('custom', source)
-		custom = importlib.util.module_from_spec(spec)
-		try:
-			spec.loader.exec_module(custom)
-		except FileNotFoundError:
-			return None
-		return custom
-
 	# Default config
 	config = {
 		'snap_prefix': 'backup',
@@ -48,12 +38,10 @@ def load_config():
 		'lockdir': '/var/lock/backurne',
 	}
 
-	for custom in ('custom.conf',):
-		custom = load(custom)
-		if custom is not None:
-			break
-
-	if custom is None:
+	custom = imp.new_module('custom')
+	try:
+		exec(open('/etc/backurne/backurne.conf', 'r').read(), custom.__dict__)
+	except FileNotFoundError:
 		return config
 
 	config = dict_merge(config, custom.config)
