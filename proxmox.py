@@ -130,7 +130,7 @@ class Proxmox():
 			Log.debug('Freezing %s' % (vm['vmid'],))
 			qemu.agent.post('fsfreeze-freeze')
 		except Exception as e:
-			Log.warn('Cannot freeze %s: %s' % (vm['vmid'], e))
+			Log.warning('Cannot freeze %s: %s' % (vm['vmid'], e))
 
 	def thaw(self, node, vm):
 		if not config['fsfreeze'] or 'qemu_agent' not in vm:
@@ -146,4 +146,4 @@ class Proxmox():
 			Log.debug('Thawing %s' % (vm['vmid'],))
 			qemu.agent.post('fsfreeze-thaw')
 		except Exception as e:
-			Log.warn('Cannot thaw %s: %s' % (vm['vmid'], e))
+			Log.warning('Cannot thaw %s: %s' % (vm['vmid'], e))

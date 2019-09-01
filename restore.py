@@ -66,7 +66,7 @@ class Restore():
 			Log.info('Please find our files in %s' % (self.tmp_dir,))
 			return self.tmp_dir
 		except Exception as e:
-			Log.warn('mount %s %s failed' % (part, self.tmp_dir))
+			Log.warning('mount %s %s failed' % (part, self.tmp_dir))
 
 	def mount(self):
 		Log.info('Mapping %s@%s ..' % (self.rbd, self.snap))
@@ -122,7 +122,7 @@ class Restore():
 				try:
 					sh.Command('umount')(i['mountpoint'])
 				except:
-					Log.warn('Cannot umount %s, maybe someone is using it ?' % (i['mountpoint'],))
+					Log.warning('Cannot umount %s, maybe someone is using it ?' % (i['mountpoint'],))
 					continue
 				os.rmdir(i['mountpoint'])
 			sh.Command('kpartx')('-dv', i['dev'])

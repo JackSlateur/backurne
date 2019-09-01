@@ -53,7 +53,7 @@ class Check():
 				msg = 'Backup found for %s, yet too old (created at %s)' % (rbd, when)
 				return {'image': rbd, 'msg': msg}
 		except Exception as e:
-			Log.warn('Exception thrown while checking %s : %s' % (args, e))
+			Log.warning('Exception thrown while checking %s : %s' % (args, e))
 
 	def cmp_snap(self, backup, ceph, rbd):
 		live_snaps = ceph.snap(rbd)
@@ -138,7 +138,7 @@ class Backup():
 		elif profile == 'hourly':
 			expiration = datetime.timedelta(hours=value)
 		else:
-			Log.warn('Unknown profile found, no action taken: %s' % (profile,))
+			Log.warning('Unknown profile found, no action taken: %s' % (profile,))
 			return False
 
 		expired_at = created_at + expiration
@@ -283,7 +283,7 @@ class Backup():
 					ceph.backup.rm(image)
 			Log.debug('Expire_backup: releasing lock %s' % (filename,))
 		except filelock.Timeout as e:
-			Log.warn(e)
+			Log.warning(e)
 
 
 class BackupProxmox(Backup):
@@ -321,7 +321,7 @@ class BackupProxmox(Backup):
 				profiles += list(add['profiles'].items())
 
 		except Exception as e:
-			Log.warn('Exception thrown while fetching profiles for %s : %s' % (vm, e))
+			Log.warning('Exception thrown while fetching profiles for %s : %s' % (vm, e))
 		return profiles
 
 	def list(self):
@@ -332,7 +332,7 @@ class BackupProxmox(Backup):
 		for vm in vms:
 			if vm['smbios'] is None and self.cluster['use_smbios'] is True:
 				if config['uuid_fallback'] is False:
-					Log.warn('No smbios found, skipping')
+					Log.warning('No smbios found, skipping')
 					continue
 			result.append(vm)
 		return result
@@ -351,12 +351,12 @@ class BackupProxmox(Backup):
 				profiles = self.__fetch_profiles(vm, disk)
 				self._create_snap(bck, profiles)
 		except Exception as e:
-			Log.warn('create_snaps: %s thrown while processing %s' % (e, vm))
+			Log.warning('create_snaps: %s thrown while processing %s' % (e, vm))
 
 		try:
 			px.thaw(vm['node'], vm)
 		except:
-			Log.warn('create_snaps: thaw failed while processing %s' % (vm,))
+			Log.warning('create_snaps: thaw failed while processing %s' % (vm,))
 
 	def expire_item(self, vm):
 		px = Proxmox(self.cluster)
@@ -373,7 +373,7 @@ class BackupProxmox(Backup):
 					self._expire_item(ceph, disk, vm)
 				Log.debug('expire_item: releasing %s' % (filename,))
 		except Exception as e:
-			Log.warn('Expire_live on %s : %s' % (vm, e))
+			Log.warning('Expire_live on %s : %s' % (vm, e))
 
 
 class BackupPlain(Backup):
@@ -392,7 +392,7 @@ class BackupPlain(Backup):
 		try:
 			self._expire_item(self.ceph, item)
 		except Exception as e:
-			Log.warn('Expire_live on %s : %s' % (item, e))
+			Log.warning('Expire_live on %s : %s' % (item, e))
 
 
 class Producer():
@@ -411,7 +411,7 @@ class Producer():
 		for i in range(0, config['live_worker']):
 			try:
 				self.queue.put(None)
-			except Exception as e:
+			except:
 				Log.error('Producer: cannot end a live_worker! This is a critical bug, we will never die')
 
 		Log.debug('Producer ended')
@@ -518,7 +518,7 @@ if __name__ == '__main__':
 	try:
 		action = sys.argv[1]
 	except IndexError:
-		Log.warn('nothing to do')
+		Log.warning('nothing to do')
 		exit(1)
 
 	if '--json' in sys.argv:
