@@ -1,0 +1,118 @@
+.TH backurne 1 "10 Sept 2019" "1.0" "backurne man page"
+.SH NAME
+backurne \- backup Ceph's RBD on Ceph, with Proxmox integration
+.SH SYNOPSIS
+.B backurne
+.RI backup
+.br
+.B backurne
+.RI precheck
+.br
+.B backurne
+.RI check
+.br
+.B backurne
+.RI check-snap
+.br
+.B backurne
+.RI ls
+.I [rbd]
+.I [--json]
+.br
+.B backurne
+.RI map
+.I rbd
+.I snapshot
+.br
+.B backurne
+.RI unmap
+.I rbd
+.I snapshot
+.br
+.B backurne
+.RI list-mapped
+.I [--json]
+
+
+.SH DESCRIPTION
+backurne is a handy tool for backuping RBD's image on RBD.
+.br
+.SH COMMANDS DESCRIPTIONS
+.IP "\fBbackup\fR" 4
+backup
+.IP
+Create backups. Backurne connects to every cluster defined on its configuration and process the required backup.
+.IP "\fBprecheck\fR" 4
+precheck
+.IP
+Preprocess checks results. Checking the current status of backup is a relatively  slow operation, which makes it unfriendly for checks using icinga2 or other nagios-like probes. Prechecking is supposed to be done regularly via cron.
+.IP "\fBcheck\fR" 4
+check
+.IP
+Check the status of backups. Any image not backed up for too long is reported as an error. The command outputs return code in a nagios-like fashion.
+.IP "\fBcheck-snap\fR" 4
+check-snap
+.IP
+Check the coherency of backups, using a hash comparison between backups and production data. This a very slow operation, as it reads 100% of the backup storage.
+.IP "\fBls\fR" 4
+ls
+.I [rbd]
+.I [--json]
+.IP
+List backed up images.
+.br
+Using the
+.I [rbd]
+argument, you can list backups for a specific image.
+.br
+The command produces human friendly output by default.
+.br
+The
+.I [--json]
+argument lets it produce machine readable json.
+.IP "\fBmap\fR" 4
+map
+.I rbd
+.I snapshot
+.IP
+Map a snapshot. A mapped snapshot allows the user to explore and restore part of a snapshot. Volatile modifications are seamlessly allowed (the backup is never modified).
+.br
+.B Backurne
+will make the backup visible in /dev. Also, partitions found in the backup (if present) are also mapped.
+.br
+Finally, if a single partition is found (or no partition table),
+.B backurne
+will try to mount that filesystem using
+.B mount(8).
+.br
+If
+.B backurne
+did not manage to mount a filesystem, a message is printed and the user is left with manual handling. As printed, the backup shall be present at /dev/nbdX, and partitions (if any) at /dev/mapper/nbdXpY.
+.IP "\fBunmap\fR" 4
+unmap
+.I rbd
+.I snapshot
+.IP
+Unmap a previously mapped snapshot, removing volating modification in the process.
+.br
+If the mapping was not fully handled by
+.I backurne,
+the user must cleanup its actions before calling
+.I unmap.
+If not,
+.I unmap
+will fail and will have to be rerun.
+.IP "\fBlist-mapped\fR" 4
+list-mapped
+.I [--json]
+.IP
+List mapped backups.
+.br
+By default, a human friendly output is produced. Use
+.I --json
+for machine readable output.
+
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+Alexandre Bruyelles <backurne@jack.fr.eu.org>
