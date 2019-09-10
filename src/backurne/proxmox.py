@@ -1,7 +1,7 @@
 import re
-from config import config
-from log import log as Log
-from ceph import Ceph
+from .config import config
+from .log import log as Log
+from .ceph import Ceph
 from proxmoxer import ProxmoxAPI
 
 

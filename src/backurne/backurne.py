@@ -10,13 +10,13 @@ import requests
 import sqlite3
 import sys
 
-import pretty
-from config import config
-from log import log as Log
-from ceph import Ceph
-from proxmox import Proxmox
-from restore import Restore
-from backup import Bck
+from . import pretty
+from .config import config
+from .log import log as Log
+from .ceph import Ceph
+from .proxmox import Proxmox
+from .restore import Restore
+from .backup import Bck
 
 
 class Check():
@@ -157,22 +157,26 @@ class Backup():
 		Log.debug('Producer: locking %s' % (filename,))
 		lock = filelock.FileLock(filename, timeout=0)
 
-		with lock:
-			for profile, value in profiles:
-				if not bck.check_profile(profile):
-					continue
+		try:
+			with lock:
+				for profile, value in profiles:
+					if not bck.check_profile(profile):
+						continue
 
-				dest, last_snap, snap_name = bck.make_snap(profile, value['count'])
-				if dest is not None:
-					todo.append({
-						'dest': dest,
-						'last_snap': last_snap,
-						'snap_name': snap_name,
-						'backup': bck,
-					})
+					dest, last_snap, snap_name = bck.make_snap(profile, value['count'])
+					if dest is not None:
+						todo.append({
+							'dest': dest,
+							'last_snap': last_snap,
+							'snap_name': snap_name,
+							'backup': bck,
+						})
+		except filelock.Timeout as e:
+			Log.debug(e)
+			return
 		Log.debug('Producer: releasing lock %s' % (filename,))
 		if len(todo) != 0:
-			queue.put(todo)
+			self.queue.put(todo)
 
 	def create_snaps(self):
 		items = self.list()
@@ -283,7 +287,7 @@ class Backup():
 					ceph.backup.rm(image)
 			Log.debug('Expire_backup: releasing lock %s' % (filename,))
 		except filelock.Timeout as e:
-			Log.warning(e)
+			Log.debug(e)
 
 
 class BackupProxmox(Backup):
@@ -372,6 +376,8 @@ class BackupProxmox(Backup):
 				with lock:
 					self._expire_item(ceph, disk, vm)
 				Log.debug('expire_item: releasing %s' % (filename,))
+		except filelock.Timeout as e:
+			Log.debug(e)
 		except Exception as e:
 			Log.warning('Expire_live on %s : %s' % (vm, e))
 
@@ -404,7 +410,7 @@ class Producer():
 		try:
 			self.__work__()
 		except Exception as e:
-			Log.error('Producer: %s' % (e,))
+			Log.error(e)
 
 		# We send one None per live_worker
 		# That way, all of them shall die
@@ -511,7 +517,7 @@ def update_check_results(check_results):
 			sql.execute('insert into results values(strftime("%s", "now"), ?, ?, ?)', (i['cluster'], i['image'], i['msg']))
 
 
-if __name__ == '__main__':
+def main():
 	if len(sys.argv) < 2:
 		pretty.usage()
 
@@ -645,3 +651,7 @@ if __name__ == '__main__':
 		if rbd is None or snap is None:
 			pretty.usage()
 		restore.umount()
+
+
+if __name__ == '__main__':
+	main()

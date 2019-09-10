@@ -2,7 +2,7 @@ import logging
 import logging.handlers
 import sys
 from termcolor import colored
-from config import config
+from .config import config
 
 
 class ConsoleFormatter(logging.Formatter):

@@ -2,8 +2,8 @@ import datetime
 import dateutil.parser
 import json
 import time
-from config import config
-from log import log as Log
+from .config import config
+from .log import log as Log
 from subprocess import Popen, PIPE, DEVNULL
 import sh
 

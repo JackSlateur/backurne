@@ -1,8 +1,8 @@
 import datetime
 import dateutil.parser
 
-from config import config
-from log import log as Log
+from .config import config
+from .log import log as Log
 
 
 class Bck():

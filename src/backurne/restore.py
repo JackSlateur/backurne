@@ -3,8 +3,8 @@ import os
 import tempfile
 import time
 
-from log import log as Log
-from ceph import Ceph
+from .log import log as Log
+from .ceph import Ceph
 import sh
 
 

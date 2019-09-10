@@ -4,7 +4,7 @@ from flask import Flask
 from flask import Blueprint
 from flask_autoindex import AutoIndexBlueprint
 import json
-from restore import Restore
+from .restore import Restore
 
 app = Flask(__name__)
 
