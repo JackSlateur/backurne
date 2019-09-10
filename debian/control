@@ -27,6 +27,7 @@ Depends: python3-termcolor,
          ${python3:Depends},
          ${shlibs:Depends}
 Suggests: xxhash,
+          jq,
 Description: Backup Ceph's RBD on Ceph, with Proxmox integration
  backurne is a handy tool for backuping RBD's image on RBD.
  Yep ! What is better, for backuping a Ceph cluster, than another Ceph cluster ?
