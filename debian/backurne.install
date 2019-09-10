@@ -1,1 +1,2 @@
 conf/backurne.conf /etc/backurne/
+bash/backurne usr/share/bash-completion/completions
