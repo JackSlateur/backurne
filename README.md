@@ -17,7 +17,7 @@ Supported features
 - Peaceful integration with other snapshots (via Proxmox web interface or whatever).
 - Multiple cluster support, with mixed type ("proxmox" and "plain").
 - A couple of backups can be stored on the live clusters, for faster recovery.
-- Optionnal **fsfreeze** support (proxmox-only) via Qemu-quest-agent.
+- Optional **fsfreeze** support (proxmox-only) via Qemu-quest-agent.
 - Backup deactivation via Proxmox's web interface.
 
 - VM tracking, for those who uses a single Proxmox cluster with multiple Ceph backend.
