@@ -154,7 +154,7 @@ class Backup():
 		todo = list()
 		filename = bck.build_dest().replace('/', '')
 		filename = '%s/%s' % (config['lockdir'], filename)
-		Log.debug('Producer: locking %s' % (filename,))
+		Log.debug('locking %s' % (filename,))
 		lock = filelock.FileLock(filename, timeout=0)
 
 		try:
@@ -174,7 +174,7 @@ class Backup():
 		except filelock.Timeout as e:
 			Log.debug(e)
 			return
-		Log.debug('Producer: releasing lock %s' % (filename,))
+		Log.debug('releasing lock %s' % (filename,))
 		if len(todo) != 0:
 			self.queue.put(todo)
 
@@ -254,7 +254,7 @@ class Backup():
 
 		filename = image.replace('/', '')
 		filename = '%s/%s' % (config['lockdir'], filename)
-		Log.debug('Expire_backup: locking %s' % (filename,))
+		Log.debug('locking %s' % (filename,))
 		lock = filelock.FileLock(filename, timeout=0)
 
 		try:
@@ -269,7 +269,7 @@ class Backup():
 					# Someone is messing around, or this is a bug
 					# Anyway, the image can be deleted
 					ceph.backup.rm(image)
-					Log.debug('Expire_backup: releasing lock %s' % (filename,))
+					Log.debug('releasing lock %s' % (filename,))
 					return
 
 				for snap in snaps:
@@ -285,7 +285,7 @@ class Backup():
 				if len(ceph.backup.snap(image)) == 0:
 					Log.info('%s has no snapshot left, deleting' % (image,))
 					ceph.backup.rm(image)
-			Log.debug('Expire_backup: releasing lock %s' % (filename,))
+			Log.debug('releasing lock %s' % (filename,))
 		except filelock.Timeout as e:
 			Log.debug(e)
 
@@ -355,12 +355,12 @@ class BackupProxmox(Backup):
 				profiles = self.__fetch_profiles(vm, disk)
 				self._create_snap(bck, profiles)
 		except Exception as e:
-			Log.warning('create_snaps: %s thrown while processing %s' % (e, vm))
+			Log.warning('%s thrown while freezing %s' % (e, vm))
 
 		try:
 			px.thaw(vm['node'], vm)
-		except:
-			Log.warning('create_snaps: thaw failed while processing %s' % (vm,))
+		except Exception as e:
+			Log.warning('%s thrown while thawing %s' % (e, vm))
 
 	def expire_item(self, vm):
 		px = Proxmox(self.cluster)
@@ -370,12 +370,12 @@ class BackupProxmox(Backup):
 				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
 				filename = bck.build_dest().replace('/', '')
 				filename = '%s/%s' % (config['lockdir'], filename)
-				Log.debug('expire_item: locking %s' % (filename,))
+				Log.debug('locking %s' % (filename,))
 				lock = filelock.FileLock(filename, timeout=0)
 
 				with lock:
 					self._expire_item(ceph, disk, vm)
-				Log.debug('expire_item: releasing %s' % (filename,))
+				Log.debug('releasing lock %s' % (filename,))
 		except filelock.Timeout as e:
 			Log.debug(e)
 		except Exception as e:
@@ -418,7 +418,7 @@ class Producer():
 			try:
 				self.queue.put(None)
 			except:
-				Log.error('Producer: cannot end a live_worker! This is a critical bug, we will never die')
+				Log.error('cannot end a live_worker! This is a critical bug, we will never die')
 
 		Log.debug('Producer ended')
 
@@ -441,7 +441,7 @@ class Consumer():
 		try:
 			self.__work__()
 		except Exception as e:
-			Log.error('Consumer: %s' % (e,))
+			Log.error(e)
 		Log.debug('Consumer ended')
 
 	def __work__(self):
@@ -454,7 +454,7 @@ class Consumer():
 			filename = '%s/%s' % (config['lockdir'], filename)
 			lock = filelock.FileLock(filename, timeout=0)
 			try:
-				Log.debug('Consumer: locking %s' % (filename,))
+				Log.debug('locking %s' % (filename,))
 				with lock:
 					for snap in snaps:
 						backup = snap['backup']
@@ -463,7 +463,7 @@ class Consumer():
 				Log.debug(e)
 			except Exception as e:
 				Log.error(e)
-			Log.debug('Consumer: releasing %s' % (filename,))
+			Log.debug('releasing lock %s' % (filename,))
 
 
 def get_sqlite():
