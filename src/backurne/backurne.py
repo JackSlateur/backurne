@@ -7,6 +7,7 @@ import filelock
 import json
 import multiprocessing
 import requests
+import setproctitle
 import sqlite3
 import sys
 
@@ -19,7 +20,7 @@ from .restore import Restore
 from .backup import Bck
 
 
-class Check():
+class Check:
 	def __init__(self, cluster):
 		self.cluster = cluster
 		self.err = list()
@@ -123,10 +124,11 @@ class CheckPlain(Check):
 		return self.err
 
 
-class Backup():
-	def __init__(self, cluster, queue):
+class Backup:
+	def __init__(self, cluster, queue, status_queue):
 		self.cluster = cluster
 		self.queue = queue
+		self.status_queue = status_queue
 
 	def is_expired(snap, last=False):
 		splited = snap.split(';')
@@ -160,7 +162,9 @@ class Backup():
 		try:
 			with lock:
 				for profile, value in profiles:
+					self.status_queue.put('add_item')
 					if not bck.check_profile(profile):
+						self.status_queue.put('done_item')
 						continue
 
 					dest, last_snap, snap_name = bck.make_snap(profile, value['count'])
@@ -185,6 +189,9 @@ class Backup():
 				pass
 
 	def _expire_item(self, ceph, disk, vm=None):
+		self.status_queue.put('add_item')
+		self.status_queue.put('done_item')
+
 		if vm is not None:
 			bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
 			rbd = disk['rbd']
@@ -251,6 +258,7 @@ class Backup():
 	def expire_backup(i):
 		ceph = i['ceph']
 		image = i['image']
+		i['status_queue'].put('done_item')
 
 		filename = image.replace('/', '')
 		filename = '%s/%s' % (config['lockdir'], filename)
@@ -291,8 +299,8 @@ class Backup():
 
 
 class BackupProxmox(Backup):
-	def __init__(self, cluster, queue):
-		super().__init__(cluster, queue)
+	def __init__(self, cluster, queue, status_queue):
+		super().__init__(cluster, queue, status_queue)
 
 	def __fetch_profiles(self, vm, disk):
 		profiles = list(config['profiles'].items())
@@ -383,8 +391,8 @@ class BackupProxmox(Backup):
 
 
 class BackupPlain(Backup):
-	def __init__(self, cluster, queue):
-		super().__init__(cluster, queue)
+	def __init__(self, cluster, queue, status_queue):
+		super().__init__(cluster, queue, status_queue)
 		self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'])
 
 	def list(self):
@@ -401,9 +409,56 @@ class BackupPlain(Backup):
 			Log.warning('Expire_live on %s : %s' % (item, e))
 
 
-class Producer():
-	def __init__(self, queue):
+class Status_updater:
+	class Real_updater:
+		def __init__(self, status_queue, desc):
+			self.todo = 0
+			self.total = 0
+			self.status_queue = status_queue
+			self.desc = desc
+
+		def __call__(self):
+			Log.debug('Real_updater started')
+			try:
+				self.__work__()
+			except Exception as e:
+				Log.error(e)
+			Log.debug('Real_updater ended')
+
+		def __work__(self):
+			while True:
+				msg = self.status_queue.get()
+				if msg == 'add_item':
+					self.total += 1
+					self.todo += 1
+				elif msg == 'done_item':
+					self.todo -= 1
+				else:
+					Log.error('Unknown message received: %s' % (msg,))
+				done = self.total - self.todo
+				msg = f'Backurne : %s/%s {self.desc}' % (done, self.total)
+				setproctitle.setproctitle(msg)
+
+	def __init__(self, manager, desc):
+		self.status_queue = manager.Queue()
+		self.desc = desc
+
+	def __enter__(self):
+		target = Status_updater.Real_updater(self.status_queue, self.desc)
+		self.real_updater = multiprocessing.Process(target=target)
+		atexit.register(self.real_updater.terminate)
+		self.real_updater.start()
+		return self.status_queue
+
+
+	def __exit__(self, type, value, traceback):
+		self.real_updater.terminate()
+
+
+class Producer:
+	def __init__(self, queue, status_queue):
 		self.queue = queue
+		self.status_queue = status_queue
 
 	def __call__(self):
 		Log.debug('Producer started')
@@ -426,15 +481,16 @@ class Producer():
 		for cluster in config['live_clusters']:
 			Log.info('Backuping %s: %s' % (cluster['type'], cluster['name']))
 			if cluster['type'] == 'proxmox':
-				bidule = BackupProxmox(cluster, self.queue)
+				bidule = BackupProxmox(cluster, self.queue, self.status_queue)
 			else:
-				bidule = BackupPlain(cluster, self.queue)
+				bidule = BackupPlain(cluster, self.queue, self.status_queue)
 			bidule.create_snaps()
 
 
-class Consumer():
-	def __init__(self, queue):
+class Consumer:
+	def __init__(self, queue, status_queue):
 		self.queue = queue
+		self.status_queue = status_queue
 
 	def __call__(self):
 		Log.debug('Consumer started')
@@ -449,6 +505,8 @@ class Consumer():
 			snaps = self.queue.get()
 			if snaps is None:
 				break
+			self.status_queue.put('done_item')
+			continue
 
 			filename = snaps[0]['dest'].replace('/', '')
 			filename = '%s/%s' % (config['lockdir'], filename)
@@ -565,42 +623,48 @@ def main():
 		manager = multiprocessing.Manager()
 		atexit.register(manager.shutdown)
 		queue = manager.Queue()
-		producer = multiprocessing.Process(target=Producer(queue))
-		atexit.register(producer.terminate)
-		producer.start()
 
-		live_workers = list()
-		for i in range(0, config['live_worker']):
-			pid = multiprocessing.Process(target=Consumer(queue))
-			atexit.register(pid.terminate)
-			live_workers.append(pid)
-			pid.start()
+		with Status_updater(manager, 'images processed') as status_queue:
+			producer = multiprocessing.Process(target=Producer(queue, status_queue))
+			atexit.register(producer.terminate)
+			producer.start()
 
-		# Workers will exit upon a None reception
-		# When all of them are done, we are done
-		for pid in live_workers:
-			pid.join()
+			live_workers = list()
+			for i in range(0, config['live_worker']):
+				pid = multiprocessing.Process(target=Consumer(queue, status_queue))
+				atexit.register(pid.terminate)
+				live_workers.append(pid)
+				pid.start()
 
-		manager.shutdown()
+			# Workers will exit upon a None reception
+			# When all of them are done, we are done
+			for pid in live_workers:
+				pid.join()
 
-		for cluster in config['live_clusters']:
-			Log.info('Expire snapshots from live %s: %s' % (cluster['type'], cluster['name']))
-			if cluster['type'] == 'proxmox':
-				bidule = BackupProxmox(cluster, None)
-			else:
-				bidule = BackupPlain(cluster, None)
-			bidule.expire_live()
+
+		with Status_updater(manager, 'images cleaned up on live clusters') as status_queue:
+			for cluster in config['live_clusters']:
+				Log.info('Expire snapshots from live %s: %s' % (cluster['type'], cluster['name']))
+				if cluster['type'] == 'proxmox':
+					bidule = BackupProxmox(cluster, None, status_queue)
+				else:
+					bidule = BackupPlain(cluster, None, status_queue)
+				bidule.expire_live()
 
 		Log.info('Expiring our snapshots')
 		# Dummy Ceph object used to retrieve the real backup Object
 		ceph = Ceph(None)
 
-		data = list()
-		for i in ceph.backup.ls():
-			data.append({'ceph': ceph, 'image': i})
-		with multiprocessing.Pool(config['backup_worker']) as pool:
-			for i in pool.imap_unordered(Backup.expire_backup, data):
-				pass
+		with Status_updater(manager, 'images cleaned up on backup cluster') as status_queue:
+			data = list()
+			for i in ceph.backup.ls():
+				data.append({'ceph': ceph, 'image': i, 'status_queue': status_queue})
+				status_queue.put('add_item')
+			with multiprocessing.Pool(config['backup_worker']) as pool:
+				for i in pool.imap_unordered(Backup.expire_backup, data):
+					pass
+
+		manager.shutdown()
 		exit(0)
 
 	try:

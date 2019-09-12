@@ -38,19 +38,19 @@ class Bck():
 
 	def __snap_name(self, profile, value):
 		name = '%s;%s' % (profile, value)
-		Log.info('Processing %s (%s)' % (self.source, name))
+		Log.debug('Processing %s (%s)' % (self.source, name))
 		name = '%s;%s' % (config['snap_prefix'], name)
 		return name
 
 	def dl_snap(self, snap_name, dest, last_snap):
-		Log.info('Exporting %s' % (self.source,))
+		Log.debug('Exporting %s' % (self.source,))
 		if not self.ceph.backup.exists(dest):
 			# Create a dummy image, on our backup cluster,
 			# which will receive a full snapshot
 			self.ceph.backup('create', dest, '-s', '1')
 
 		self.ceph.do_backup(self.rbd, snap_name, dest, last_snap)
-		Log.info('Export %s complete' % (self.source,))
+		Log.debug('Export %s complete' % (self.source,))
 
 	def last_snap_profile(self, snaps, profile):
 		good = list()
@@ -100,9 +100,9 @@ class Bck():
 			last_snap = self.ceph.get_last_shared_snap(self.rbd, dest)
 
 		if last_snap is None:
-			Log.info('%s: doing full backup' % (self.source,))
+			Log.debug('%s: doing full backup' % (self.source,))
 		else:
-			Log.info('%s: doing incremental backup based on %s' % (self.source, last_snap))
+			Log.debug('%s: doing incremental backup based on %s' % (self.source, last_snap))
 
 		now = datetime.datetime.now().isoformat()
 		snap_name = '%s;%s' % (self.snap_name, now)
