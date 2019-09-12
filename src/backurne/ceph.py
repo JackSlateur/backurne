@@ -152,7 +152,7 @@ class Ceph():
 	def mk_snap(self, image, snap, vm=None):
 		snap = self.__esc(snap)
 
-		Log.info('Creating snapshot %s@%s .. ' % (image, snap))
+		Log.debug('Creating snapshot %s@%s .. ' % (image, snap))
 
 		if vm is None:
 			self('snap', 'create', '--snap', snap, image)

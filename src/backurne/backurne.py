@@ -6,6 +6,7 @@ import dateutil.parser
 import filelock
 import json
 import multiprocessing
+import progressbar
 import requests
 import setproctitle
 import sqlite3
@@ -291,7 +292,7 @@ class Backup:
 						ceph.backup.rm_snap(image, snaps[0])
 
 				if len(ceph.backup.snap(image)) == 0:
-					Log.info('%s has no snapshot left, deleting' % (image,))
+					Log.debug('%s has no snapshot left, deleting' % (image,))
 					ceph.backup.rm(image)
 			Log.debug('releasing lock %s' % (filename,))
 		except filelock.Timeout as e:
@@ -417,12 +418,24 @@ class Status_updater:
 			self.status_queue = status_queue
 			self.desc = desc
 
+			if config['log_level'] != 'debug':
+				# progressbar uses signal.SIGWINCH
+				# It messes with multiprocessing, so we break it
+				import signal
+				signal.signal = None
+				widget = [progressbar.widgets.SimpleProgress(), ' ', desc, ' (', progressbar.widgets.Timer(), ')']
+				self.bar = progressbar.ProgressBar(maxval=1, widgets=widget)
+
 		def __call__(self):
 			Log.debug('Real_updater started')
+			if config['log_level'] != 'debug':
+				self.bar.start()
 			try:
 				self.__work__()
 			except Exception as e:
 				Log.error(e)
+			if config['log_level'] != 'debug':
+				self.bar.finish()
 			Log.debug('Real_updater ended')
 
 		def __work__(self):
@@ -438,6 +451,10 @@ class Status_updater:
 				done = self.total - self.todo
 				msg = f'Backurne : %s/%s {self.desc}' % (done, self.total)
 				setproctitle.setproctitle(msg)
+
+				if config['log_level'] != 'debug':
+					self.bar.maxval = self.total
+					self.bar.update(done)
 
 	def __init__(self, manager, desc):
 		self.status_queue = manager.Queue()
@@ -479,7 +496,7 @@ class Producer:
 
 	def __work__(self):
 		for cluster in config['live_clusters']:
-			Log.info('Backuping %s: %s' % (cluster['type'], cluster['name']))
+			Log.debug('Backuping %s: %s' % (cluster['type'], cluster['name']))
 			if cluster['type'] == 'proxmox':
 				bidule = BackupProxmox(cluster, self.queue, self.status_queue)
 			else:
@@ -618,7 +635,7 @@ def main():
 		print_check_results()
 
 	if action == 'backup':
-		Log.info('Starting backup ..')
+		Log.debug('Starting backup ..')
 
 		manager = multiprocessing.Manager()
 		atexit.register(manager.shutdown)
@@ -644,14 +661,14 @@ def main():
 
 		with Status_updater(manager, 'images cleaned up on live clusters') as status_queue:
 			for cluster in config['live_clusters']:
-				Log.info('Expire snapshots from live %s: %s' % (cluster['type'], cluster['name']))
+				Log.debug('Expire snapshots from live %s: %s' % (cluster['type'], cluster['name']))
 				if cluster['type'] == 'proxmox':
 					bidule = BackupProxmox(cluster, None, status_queue)
 				else:
 					bidule = BackupPlain(cluster, None, status_queue)
 				bidule.expire_live()
 
-		Log.info('Expiring our snapshots')
+		Log.debug('Expiring our snapshots')
 		# Dummy Ceph object used to retrieve the real backup Object
 		ceph = Ceph(None)
 

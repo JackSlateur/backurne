@@ -27,5 +27,5 @@ setuptools.setup(
 	python_requires='>=3.5',
 	install_requires=['termcolor', 'PTable', 'requests',
 			'proxmoxer', 'sh', 'python-dateutil', 'filelock',
-                        'setproctitle'],
+                        'setproctitle', 'progressbar'],
 )
