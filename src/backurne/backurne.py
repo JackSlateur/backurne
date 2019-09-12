@@ -522,8 +522,6 @@ class Consumer:
 			snaps = self.queue.get()
 			if snaps is None:
 				break
-			self.status_queue.put('done_item')
-			continue
 
 			filename = snaps[0]['dest'].replace('/', '')
 			filename = '%s/%s' % (config['lockdir'], filename)
@@ -539,6 +537,7 @@ class Consumer:
 			except Exception as e:
 				Log.error(e)
 			Log.debug('releasing lock %s' % (filename,))
+			self.status_queue.put('done_item')
 
 
 def get_sqlite():
