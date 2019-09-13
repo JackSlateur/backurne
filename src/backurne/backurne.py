@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import argparse
 import atexit
 import datetime
 import dateutil.parser
@@ -10,7 +11,6 @@ import progressbar
 import requests
 import setproctitle
 import sqlite3
-import sys
 import time
 import queue
 
@@ -480,7 +480,6 @@ class Status_updater:
 		self.real_updater.start()
 		return self.status_queue
 
-
 	def __exit__(self, type, value, traceback):
 		self.real_updater.terminate()
 
@@ -546,7 +545,7 @@ class Consumer:
 				Log.debug('locking %s' % (filename,))
 				with lock:
 					for snap in snaps:
-						setproctitle.setproctitle(f'Backurne: downloading {bck.rbd} on {bck.name}')
+						setproctitle.setproctitle(f'Backurne: downloading {snap["snap_name"]}')
 						backup = snap['backup']
 						backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
 			except filelock.Timeout as e:
@@ -609,34 +608,41 @@ def update_check_results(check_results):
 			sql.execute('insert into results values(strftime("%s", "now"), ?, ?, ?)', (i['cluster'], i['image'], i['msg']))
 
 
+def get_args():
+	parser = argparse.ArgumentParser()
+	sub = parser.add_subparsers(dest='action', required=True)
+	sub.add_parser('backup')
+	sub.add_parser('precheck')
+	sub.add_parser('check')
+	sub.add_parser('check-snap')
+	sub.add_parser('stats')
+
+	ls = sub.add_parser('list-mapped')
+	ls.add_argument('--json', action='store_true')
+
+	ls = sub.add_parser('ls')
+	ls.add_argument(dest='rbd', nargs='?')
+	ls.add_argument('--json', action='store_true')
+
+	_map = sub.add_parser('map')
+	_map.add_argument(dest='rbd')
+	_map.add_argument(dest='snapshot')
+
+	unmap = sub.add_parser('unmap')
+	unmap.add_argument(dest='rbd')
+	unmap.add_argument(dest='snapshot')
+	return parser.parse_args()
+
+
 def main():
-	if len(sys.argv) < 2:
-		pretty.usage()
-
-	try:
-		action = sys.argv[1]
-	except IndexError:
-		Log.warning('nothing to do')
-		exit(1)
-
-	if '--json' in sys.argv:
-		json_format = True
-		sys.argv.remove('--json')
-	else:
-		json_format = False
-
-	if action not in ('backup', 'precheck', 'check', 'check-snap', 'ls', 'list-mapped',
-			'map', 'unmap', 'stats'):
-		Log.error('Action %s unknown' % (action,))
-		pretty.usage()
-
-	if action == 'stats':
+	args = get_args()
+	if args.action == 'stats':
 		stats.print_stats()
 
-	if action == 'check':
+	if args.action == 'check':
 		print_check_results()
 
-	if action in ('precheck', 'check-snap'):
+	if args.action in ('precheck', 'check-snap'):
 		result = list()
 
 		for cluster in config['live_clusters']:
@@ -645,7 +651,7 @@ def main():
 				check = CheckProxmox(cluster)
 			else:
 				check = CheckPlain(cluster)
-			if action == 'precheck':
+			if args.action == 'precheck':
 				ret = check.check()
 			else:
 				ret = check.check_snap()
@@ -654,9 +660,7 @@ def main():
 		update_check_results(result)
 		print_check_results()
 
-	if action == 'backup':
-		Log.debug('Starting backup ..')
-
+	if args.action == 'backup':
 		manager = multiprocessing.Manager()
 		atexit.register(manager.shutdown)
 		queue = manager.Queue()
@@ -677,7 +681,6 @@ def main():
 			# When all of them are done, we are done
 			for pid in live_workers:
 				pid.join()
-
 
 		with Status_updater(manager, 'images cleaned up on live clusters') as status_queue:
 			for cluster in config['live_clusters']:
@@ -704,20 +707,10 @@ def main():
 		manager.shutdown()
 		exit(0)
 
-	try:
-		rbd = sys.argv[2]
-	except:
-		rbd = None
-
-	try:
-		snap = sys.argv[3]
-	except:
-		snap = None
-
-	restore = Restore(rbd, snap)
-	if action == 'ls':
+	if args.action == 'ls':
+		restore = Restore(args.rbd, None)
 		data = restore.ls()
-		if rbd is None:
+		if args.rbd is None:
 			pt = pretty.Pt(['Ident', 'Disk', 'UUID'])
 
 			for i in data:
@@ -730,27 +723,26 @@ def main():
 				row = [i['creation'], i['uuid']]
 				pt.add_row(row)
 
-		if json_format is True:
+		if args.json is True:
 			print(json.dumps(data, default=str))
 		else:
 			print(pt)
-	elif action == 'list-mapped':
+	elif args.action == 'list-mapped':
+		restore = Restore(None, None)
 		data = restore.list_mapped()
 		pt = pretty.Pt(['rbd', 'snap', 'mount'])
 		for i in data:
 			pt.add_row([i['parent_image'], i['parent_snap'], i['mountpoint']])
 
-		if json_format is True:
+		if args.json is True:
 			print(json.dumps(data))
 		else:
 			print(pt)
-	elif action == 'map':
-		if rbd is None or snap is None:
-			pretty.usage()
+	elif args.action == 'map':
+		restore = Restore(args.rbd, args.snapshot)
 		restore.mount()
-	elif action == 'unmap':
-		if rbd is None or snap is None:
-			pretty.usage()
+	elif args.action == 'unmap':
+		restore = Restore(args.rbd, args.snapshot)
 		restore.umount()
 
 
