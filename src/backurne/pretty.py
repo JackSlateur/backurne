@@ -23,6 +23,7 @@ def usage():
 	sys.stderr.write('\t%s %s [%s]\n' % (me, bold('ls'), rbd))
 	sys.stderr.write('\t%s %s %s\n' % (me, bold('map'), snap))
 	sys.stderr.write('\t%s %s %s\n' % (me, bold('unmap'), snap))
+	sys.stderr.write('\t%s %s\n' % (me, bold('stats')))
 	exit(1)
 
 

@@ -19,6 +19,7 @@ from .ceph import Ceph
 from .proxmox import Proxmox
 from .restore import Restore
 from .backup import Bck
+from . import stats
 
 
 class Check:
@@ -608,9 +609,12 @@ def main():
 		json_format = False
 
 	if action not in ('backup', 'precheck', 'check', 'check-snap', 'ls', 'list-mapped',
-			'map', 'unmap'):
+			'map', 'unmap', 'stats'):
 		Log.error('Action %s unknown' % (action,))
 		pretty.usage()
+
+	if action == 'stats':
+		stats.print_stats()
 
 	if action == 'check':
 		print_check_results()

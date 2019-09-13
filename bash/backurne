@@ -7,7 +7,7 @@ _backurne(){
 
 	if [ "$prev" == "backurne" ]
 	then
-		opts="backup check check-snap list-mapped ls map unmap"
+		opts="backup check check-snap list-mapped ls map unmap stats"
 		COMPREPLY=($(compgen -W "$opts" -- ${cur}))
 		return 0
 	fi
