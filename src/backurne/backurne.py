@@ -158,13 +158,9 @@ class Backup:
 
 	def _create_snap(self, bck, profiles):
 		todo = list()
-		filename = bck.build_dest().replace('/', '')
-		filename = '%s/%s' % (config['lockdir'], filename)
-		Log.debug('locking %s' % (filename,))
-		lock = filelock.FileLock(filename, timeout=0)
 
 		try:
-			with lock:
+			with Lock(bck.build_dest()):
 				for profile, value in profiles:
 					self.status_queue.put('add_item')
 					if not bck.check_profile(profile):
@@ -180,10 +176,8 @@ class Backup:
 							'snap_name': snap_name,
 							'backup': bck,
 						})
-		except filelock.Timeout as e:
-			Log.debug(e)
-			return
-		Log.debug('releasing lock %s' % (filename,))
+		except filelock.Timeout:
+			pass
 		if len(todo) != 0:
 			self.queue.put(todo)
 		setproctitle.setproctitle('Backurne idle producer')
@@ -266,13 +260,8 @@ class Backup:
 		image = i['image']
 		i['status_queue'].put('done_item')
 
-		filename = image.replace('/', '')
-		filename = '%s/%s' % (config['lockdir'], filename)
-		Log.debug('locking %s' % (filename,))
-		lock = filelock.FileLock(filename, timeout=0)
-
 		try:
-			with lock:
+			with Lock(image):
 				snaps = ceph.backup.snap(image)
 				try:
 					# Pop the last snapshot
@@ -283,7 +272,6 @@ class Backup:
 					# Someone is messing around, or this is a bug
 					# Anyway, the image can be deleted
 					ceph.backup.rm(image)
-					Log.debug('releasing lock %s' % (filename,))
 					return
 
 				for snap in snaps:
@@ -299,9 +287,8 @@ class Backup:
 				if len(ceph.backup.snap(image)) == 0:
 					Log.debug('%s has no snapshot left, deleting' % (image,))
 					ceph.backup.rm(image)
-			Log.debug('releasing lock %s' % (filename,))
-		except filelock.Timeout as e:
-			Log.debug(e)
+		except filelock.Timeout:
+			pass
 
 
 class BackupProxmox(Backup):
@@ -383,14 +370,8 @@ class BackupProxmox(Backup):
 			for disk in vm['to_backup']:
 				ceph = px.ceph_storage[disk['ceph']]
 				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
-				filename = bck.build_dest().replace('/', '')
-				filename = '%s/%s' % (config['lockdir'], filename)
-				Log.debug('locking %s' % (filename,))
-				lock = filelock.FileLock(filename, timeout=0)
-
-				with lock:
+				with Lock(bck.build_dest()):
 					self._expire_item(ceph, disk, vm)
-				Log.debug('releasing lock %s' % (filename,))
 		except filelock.Timeout as e:
 			Log.debug(e)
 		except Exception as e:
@@ -484,6 +465,21 @@ class Status_updater:
 		self.real_updater.terminate()
 
 
+class Lock:
+	def __init__(self, path):
+		path = path.replace('/', '')
+		self.path = f'{config["lockdir"]}/{path}'
+		self.lock = filelock.FileLock(self.path, timeout=0)
+
+	def __enter__(self):
+		Log.debug(f'locking {self.path}')
+		self.lock.acquire()
+
+	def __exit__(self, type, value, traceback):
+		Log.debug(f'releasing lock {self.path}')
+		self.lock.release()
+
+
 class Producer:
 	def __init__(self, queue, status_queue):
 		self.queue = queue
@@ -538,21 +534,16 @@ class Consumer:
 			if snaps is None:
 				break
 
-			filename = snaps[0]['dest'].replace('/', '')
-			filename = '%s/%s' % (config['lockdir'], filename)
-			lock = filelock.FileLock(filename, timeout=0)
 			try:
-				Log.debug('locking %s' % (filename,))
-				with lock:
+				with Lock(snaps[0]['dest']):
 					for snap in snaps:
 						setproctitle.setproctitle(f'Backurne: downloading {snap["snap_name"]}')
 						backup = snap['backup']
 						backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
 			except filelock.Timeout as e:
-				Log.debug(e)
+				pass
 			except Exception as e:
 				Log.error(e)
-			Log.debug('releasing lock %s' % (filename,))
 			self.status_queue.put('done_item')
 			setproctitle.setproctitle('Backurne idle consumer')
 
@@ -638,11 +629,9 @@ def main():
 	args = get_args()
 	if args.action == 'stats':
 		stats.print_stats()
-
-	if args.action == 'check':
+	elif args.action == 'check':
 		print_check_results()
-
-	if args.action in ('precheck', 'check-snap'):
+	elif args.action in ('precheck', 'check-snap'):
 		result = list()
 
 		for cluster in config['live_clusters']:
@@ -659,8 +648,7 @@ def main():
 
 		update_check_results(result)
 		print_check_results()
-
-	if args.action == 'backup':
+	elif args.action == 'backup':
 		manager = multiprocessing.Manager()
 		atexit.register(manager.shutdown)
 		queue = manager.Queue()
@@ -705,9 +693,7 @@ def main():
 					pass
 
 		manager.shutdown()
-		exit(0)
-
-	if args.action == 'ls':
+	elif args.action == 'ls':
 		restore = Restore(args.rbd, None)
 		data = restore.ls()
 		if args.rbd is None:
