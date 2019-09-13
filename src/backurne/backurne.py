@@ -11,6 +11,8 @@ import requests
 import setproctitle
 import sqlite3
 import sys
+import time
+import queue
 
 from . import pretty
 from .config import config
@@ -439,9 +441,22 @@ class Status_updater:
 				self.bar.finish()
 			Log.debug('Real_updater ended')
 
+		def __update(self):
+			done = self.total - self.todo
+			msg = f'Backurne : %s/%s {self.desc}' % (done, self.total)
+			setproctitle.setproctitle(msg)
+			if config['log_level'] != 'debug':
+				self.bar.maxval = self.total
+				self.bar.update(done)
+
 		def __work__(self):
 			while True:
-				msg = self.status_queue.get()
+				try:
+					msg = self.status_queue.get(block=False)
+				except queue.Empty:
+					self.__update()
+					time.sleep(1)
+					continue
 				if msg == 'add_item':
 					self.total += 1
 					self.todo += 1
@@ -449,13 +464,7 @@ class Status_updater:
 					self.todo -= 1
 				else:
 					Log.error('Unknown message received: %s' % (msg,))
-				done = self.total - self.todo
-				msg = f'Backurne : %s/%s {self.desc}' % (done, self.total)
-				setproctitle.setproctitle(msg)
-
-				if config['log_level'] != 'debug':
-					self.bar.maxval = self.total
-					self.bar.update(done)
+				self.__update()
 
 	def __init__(self, manager, desc):
 		self.status_queue = manager.Queue()
