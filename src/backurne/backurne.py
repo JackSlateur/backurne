@@ -171,6 +171,7 @@ class Backup:
 						self.status_queue.put('done_item')
 						continue
 
+					setproctitle.setproctitle(f'Backurne: snapshooting {bck.rbd} on {bck.name}')
 					dest, last_snap, snap_name = bck.make_snap(profile, value['count'])
 					if dest is not None:
 						todo.append({
@@ -185,6 +186,7 @@ class Backup:
 		Log.debug('releasing lock %s' % (filename,))
 		if len(todo) != 0:
 			self.queue.put(todo)
+		setproctitle.setproctitle('Backurne idle producer')
 
 	def create_snaps(self):
 		items = self.list()
@@ -354,6 +356,7 @@ class BackupProxmox(Backup):
 		return result
 
 	def create_snap(self, vm):
+		setproctitle.setproctitle('Backurne idle producer')
 		px = Proxmox(self.cluster)
 		try:
 			# We freeze the VM once, thus create all snaps at the same time
@@ -489,6 +492,7 @@ class Producer:
 
 	def __call__(self):
 		Log.debug('Producer started')
+		setproctitle.setproctitle('Backurne Producer')
 		try:
 			self.__work__()
 		except Exception as e:
@@ -520,6 +524,7 @@ class Consumer:
 		self.status_queue = status_queue
 
 	def __call__(self):
+		setproctitle.setproctitle('Backurne Consumer')
 		Log.debug('Consumer started')
 		try:
 			self.__work__()
@@ -529,6 +534,7 @@ class Consumer:
 
 	def __work__(self):
 		while True:
+			setproctitle.setproctitle('Backurne idle consumer')
 			snaps = self.queue.get()
 			if snaps is None:
 				break
@@ -540,6 +546,7 @@ class Consumer:
 				Log.debug('locking %s' % (filename,))
 				with lock:
 					for snap in snaps:
+						setproctitle.setproctitle(f'Backurne: downloading {bck.rbd} on {bck.name}')
 						backup = snap['backup']
 						backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
 			except filelock.Timeout as e:
@@ -548,6 +555,7 @@ class Consumer:
 				Log.error(e)
 			Log.debug('releasing lock %s' % (filename,))
 			self.status_queue.put('done_item')
+			setproctitle.setproctitle('Backurne idle consumer')
 
 
 def get_sqlite():
