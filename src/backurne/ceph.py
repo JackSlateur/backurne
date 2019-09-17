@@ -138,7 +138,7 @@ class Ceph():
 		Log.debug('Deleting image %s ..' % (image,))
 		try:
 			self('rm', image)
-		except:
+		except sh.ErrorReturnCode:
 			Log.debug('%s cannot be removed, maybe someone mapped it' % (image,))
 
 	def rm_snap(self, image, snap):
@@ -146,7 +146,7 @@ class Ceph():
 		snap = self.__esc(snap)
 		try:
 			self('snap', 'rm', '--snap', snap, image)
-		except:
+		except sh.ErrorReturnCode:
 			Log.debug('Cannot rm %s@%s, may be held by something' % (image, snap))
 
 	def mk_snap(self, image, snap, vm=None):
@@ -158,16 +158,13 @@ class Ceph():
 			self('snap', 'create', '--snap', snap, image)
 			return
 
-		try:
-			self('snap', 'create', '--snap', snap, image)
-		except Exception as e:
-			raise e
+		self('snap', 'create', '--snap', snap, image)
 
 	def exists(self, image):
 		try:
 			self.cmd('info', image)
 			return True
-		except:
+		except sh.ErrorReturnCode:
 			return False
 
 	def do_backup(self, image, snap, dest, last_snap=None):

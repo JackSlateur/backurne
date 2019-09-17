@@ -65,7 +65,7 @@ class Restore():
 			sh.Command('mount')(part, self.tmp_dir)
 			Log.info('Please find our files in %s' % (self.tmp_dir,))
 			return self.tmp_dir
-		except Exception as e:
+		except Exception:
 			Log.warning('mount %s %s failed' % (part, self.tmp_dir))
 
 	def mount(self):
@@ -101,7 +101,7 @@ class Restore():
 				# be enough
 				try:
 					sh.Command('timeout')('30', 'xfs_repair', '-L', self.dev)
-				except:
+				except sh.ErrorReturnCode:
 					# If xfs_repair timed out, an
 					# Exception is thrown. Do not care.
 					pass
@@ -109,7 +109,7 @@ class Restore():
 		self.tmp_dir = tempfile.mkdtemp()
 		try:
 			return self.mount_rbd(kpartx)
-		except:
+		except Exception:
 			pass
 
 	def umount(self):
@@ -121,7 +121,7 @@ class Restore():
 			if i['mountpoint'] is not None:
 				try:
 					sh.Command('umount')(i['mountpoint'])
-				except:
+				except sh.ErrorReturnCode:
 					Log.warning('Cannot umount %s, maybe someone is using it ?' % (i['mountpoint'],))
 					continue
 				os.rmdir(i['mountpoint'])

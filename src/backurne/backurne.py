@@ -8,6 +8,7 @@ import multiprocessing
 import progressbar
 import requests
 import setproctitle
+import signal
 import sqlite3
 import time
 import queue
@@ -40,12 +41,12 @@ class Check:
 			rbd = args['image']
 
 			if not ceph.backup.exists(backup.dest):
-				msg = 'No backup found for %s (image does not exists)' % (rbd,)
+				msg = f'No backup found for {rbd} (image does not exists)'
 				return {'image': rbd, 'msg': msg}
 
 			last = ceph.get_last_shared_snap(rbd, backup.dest)
 			if last is None:
-				msg = 'No backup found for %s (no shared snap)' % (rbd,)
+				msg = f'No backup found for {rbd} (no shared snap)'
 				return {'image': rbd, 'msg': msg}
 
 			when = last.split(';')[3]
@@ -53,20 +54,20 @@ class Check:
 			deadline = datetime.timedelta(days=1) + datetime.timedelta(hours=6)
 			deadline = datetime.datetime.now() - deadline
 			if when < deadline:
-				msg = 'Backup found for %s, yet too old (created at %s)' % (rbd, when)
+				msg = f'Backup found for {rbd}, yet too old (created at {when})'
 				return {'image': rbd, 'msg': msg}
 		except Exception as e:
-			Log.warning('Exception thrown while checking %s : %s' % (args, e))
+			Log.warning(f'{e} thrown while checking {args}')
 
 	def cmp_snap(self, backup, ceph, rbd):
 		live_snaps = ceph.snap(rbd)
 		try:
 			backup_snaps = ceph.backup.snap(backup.dest)
-		except:
+		except Exception:
 			backup_snaps = []
 		inter = list(set(live_snaps).intersection(backup_snaps))
 		for snap in inter:
-			Log.debug('checking %s @ %s' % (rbd, snap))
+			Log.debug(f'checking {rbd} @ {snap}')
 			live = ceph.checksum(rbd, snap)
 			back = ceph.backup.checksum(backup.dest, snap)
 			if live == back:
@@ -74,7 +75,7 @@ class Check:
 
 			err = {
 				'image': rbd,
-				'msg': 'ERR: shared snapshot %s does not match\n\tOn live (image: %s): %s\n\tOn backup (image: %s): %s' % (snap, rbd, live, backup.dest, back),
+				'msg': f'ERR: shared snapshot {snap} does not match\n\tOn live (image: {rbd}): {live}\n\tOn backup (image: {backup.dest}): {back}'
 			}
 			self.add_err(err)
 
@@ -142,7 +143,7 @@ class Backup:
 		elif profile == 'hourly':
 			expiration = datetime.timedelta(hours=value)
 		else:
-			Log.warning('Unknown profile found, no action taken: %s' % (profile,))
+			Log.warning(f'Unknown profile found, no action taken: {profile}')
 			return False
 
 		expired_at = created_at + expiration
@@ -196,8 +197,6 @@ class Backup:
 		else:
 			bck = Bck(self.cluster['name'], ceph, disk)
 			rbd = disk
-
-		bck.build_dest()
 
 		backups = Ceph(None).backup.snap(bck.build_dest())
 
@@ -283,7 +282,7 @@ class Backup:
 						ceph.backup.rm_snap(image, snaps[0])
 
 				if len(ceph.backup.snap(image)) == 0:
-					Log.debug('%s has no snapshot left, deleting' % (image,))
+					Log.debug(f'{image} has no snapshot left, deleting')
 					ceph.backup.rm(image)
 		except filelock.Timeout:
 			pass
@@ -324,7 +323,7 @@ class BackupProxmox(Backup):
 				profiles += list(add['profiles'].items())
 
 		except Exception as e:
-			Log.warning('Exception thrown while fetching profiles for %s : %s' % (vm, e))
+			Log.warning(f'{e} thrown while fetching profiles for {vm}')
 		return profiles
 
 	def list(self):
@@ -343,6 +342,7 @@ class BackupProxmox(Backup):
 	def create_snap(self, vm):
 		setproctitle.setproctitle('Backurne idle producer')
 		px = Proxmox(self.cluster)
+
 		try:
 			# We freeze the VM once, thus create all snaps at the same time
 			# Exports are done after thawing, because it it time-consuming,
@@ -354,13 +354,10 @@ class BackupProxmox(Backup):
 				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
 				profiles = self.__fetch_profiles(vm, disk)
 				self._create_snap(bck, profiles)
-		except Exception as e:
-			Log.warning('%s thrown while freezing %s' % (e, vm))
 
-		try:
 			px.thaw(vm['node'], vm)
 		except Exception as e:
-			Log.warning('%s thrown while thawing %s' % (e, vm))
+			Log.error(e)
 
 	def expire_item(self, vm):
 		px = Proxmox(self.cluster)
@@ -373,7 +370,7 @@ class BackupProxmox(Backup):
 		except filelock.Timeout as e:
 			Log.debug(e)
 		except Exception as e:
-			Log.warning('Expire_live on %s : %s' % (vm, e))
+			Log.warning(f'{e} thrown while expiring live {vm}')
 
 
 class BackupPlain(Backup):
@@ -385,6 +382,7 @@ class BackupPlain(Backup):
 		return self.ceph.ls()
 
 	def create_snap(self, rbd):
+		setproctitle.setproctitle('Backurne idle producer')
 		bck = Bck(self.cluster['name'], self.ceph, rbd)
 		self._create_snap(bck, config['profiles'].items())
 
@@ -392,7 +390,7 @@ class BackupPlain(Backup):
 		try:
 			self._expire_item(self.ceph, item)
 		except Exception as e:
-			Log.warning('Expire_live on %s : %s' % (item, e))
+			Log.warning(f'{e} thrown while expiring live {item}')
 
 
 class Status_updater:
@@ -406,7 +404,6 @@ class Status_updater:
 			if config['log_level'] != 'debug':
 				# progressbar uses signal.SIGWINCH
 				# It messes with multiprocessing, so we break it
-				import signal
 				signal.signal = None
 				widget = [progressbar.widgets.SimpleProgress(), ' ', desc, ' (', progressbar.widgets.Timer(), ')']
 				self.bar = progressbar.ProgressBar(maxval=1, widgets=widget)
@@ -445,7 +442,7 @@ class Status_updater:
 				elif msg == 'done_item':
 					self.todo -= 1
 				else:
-					Log.error('Unknown message received: %s' % (msg,))
+					Log.error(f'Unknown message received: {msg}')
 				self.__update()
 
 	def __init__(self, manager, desc):
@@ -538,7 +535,7 @@ class Consumer:
 						setproctitle.setproctitle(f'Backurne: downloading {snap["snap_name"]}')
 						backup = snap['backup']
 						backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
-			except filelock.Timeout as e:
+			except filelock.Timeout:
 				pass
 			except Exception as e:
 				Log.error(e)
@@ -559,7 +556,7 @@ def print_check_results():
 	failed = [i for i in failed]
 
 	if len(failed) > 0:
-		print('Error: %s failed backups found' % (len(failed),))
+		print(f'Error: {len(failed)} failed backups found')
 		for err in failed:
 			print(err[3])
 		exit(2)
@@ -633,7 +630,7 @@ def main():
 		result = list()
 
 		for cluster in config['live_clusters']:
-			Log.info('Checking %s: %s' % (cluster['type'], cluster['name']))
+			Log.info(f'Checking {cluster["type"]}: {cluster["name"]}')
 			if cluster['type'] == 'proxmox':
 				check = CheckProxmox(cluster)
 			else:
@@ -670,7 +667,7 @@ def main():
 
 		with Status_updater(manager, 'images cleaned up on live clusters') as status_queue:
 			for cluster in config['live_clusters']:
-				Log.debug('Expire snapshots from live %s: %s' % (cluster['type'], cluster['name']))
+				Log.debug(f'Expire snapshots from live {cluster["type"]}: {cluster["name"]}')
 				if cluster['type'] == 'proxmox':
 					bidule = BackupProxmox(cluster, None, status_queue)
 				else:

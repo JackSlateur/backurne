@@ -1,7 +1,5 @@
-import json
 import humanize
 import multiprocessing
-from sh import rbd
 
 from .config import config
 from .ceph import Ceph

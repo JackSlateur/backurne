@@ -13,7 +13,7 @@ class Bck():
 		self.vm = vm
 		self.adapter = adapter
 
-		self.source = '%s:%s' % (self.name, self.rbd)
+		self.source = f'{self.name}:{self.rbd}'
 
 		self.dest = self.build_dest()
 
@@ -30,27 +30,27 @@ class Bck():
 			if self.vm['px'].px_config['use_smbios']:
 				if self.vm['smbios'] is not None:
 					ident = self.vm['smbios']
-					dest = '%s;%s;%s' % (ident, self.adapter, comment)
+					dest = f'{ident};{self.adapter};{comment}'
 					return dest
 
-		dest = '%s;%s;%s' % (ident, self.rbd, comment)
+		dest = f'{ident};{self.rbd};{comment}'
 		return dest
 
 	def __snap_name(self, profile, value):
-		name = '%s;%s' % (profile, value)
-		Log.debug('Processing %s (%s)' % (self.source, name))
-		name = '%s;%s' % (config['snap_prefix'], name)
+		name = f'{profile};{value}'
+		Log.debug(f'Processing {self.source} ({name})')
+		name = f'{config["snap_prefix"]};{name}'
 		return name
 
 	def dl_snap(self, snap_name, dest, last_snap):
-		Log.debug('Exporting %s' % (self.source,))
+		Log.debug(f'Exporting {self.source}')
 		if not self.ceph.backup.exists(dest):
 			# Create a dummy image, on our backup cluster,
 			# which will receive a full snapshot
 			self.ceph.backup('create', dest, '-s', '1')
 
 		self.ceph.do_backup(self.rbd, snap_name, dest, last_snap)
-		Log.debug('Export %s complete' % (self.source,))
+		Log.debug(f'Export {self.source} complete')
 
 	def last_snap_profile(self, snaps, profile):
 		good = list()
@@ -64,7 +64,7 @@ class Bck():
 	def check_profile(self, profile):
 		try:
 			last_profile = self.last_snap_profile(self.ceph.backup.snap(self.dest), profile)
-		except:
+		except Exception:
 			# Image does not exists ?
 			return True
 
@@ -91,21 +91,21 @@ class Bck():
 		if self.last_created_snap is not None:
 			last_snap = self.last_created_snap
 		elif len(self.ceph.snap(self.rbd)) == 0:
-			Log.debug('No snaps found on %s' % (self.source,))
+			Log.debug(f'No snaps found on {self.source}')
 		elif not self.ceph.backup.exists(dest):
-			Log.debug('backup:%s does not exist' % (dest,))
+			Log.debug(f'backup:{dest} does not exist')
 		elif len(self.ceph.backup.snap(dest)) == 0:
-			Log.debug('No snaps found for backup:%s' % (dest,))
+			Log.debug(f'No snaps found for backup:{dest}')
 		else:
 			last_snap = self.ceph.get_last_shared_snap(self.rbd, dest)
 
 		if last_snap is None:
-			Log.debug('%s: doing full backup' % (self.source,))
+			Log.debug(f'{self.source}: doing full backup')
 		else:
-			Log.debug('%s: doing incremental backup based on %s' % (self.source, last_snap))
+			Log.debug(f'{self.source}: doing incremental backup based on {last_snap}')
 
 		now = datetime.datetime.now().isoformat()
-		snap_name = '%s;%s' % (self.snap_name, now)
+		snap_name = f'{self.snap_name};{now}'
 		self.last_created_snap = snap_name
 
 		self.ceph.mk_snap(self.rbd, snap_name, self.vm)
