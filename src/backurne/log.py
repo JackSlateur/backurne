@@ -8,7 +8,7 @@ from .config import config
 class ConsoleFormatter(logging.Formatter):
 	def format(self, record):
 		if record.levelno == logging.DEBUG:
-			msg = '[%s:%s:%s()] %s' % (record.filename, record.lineno, record.funcName, record.msg)
+			msg = f'[{record.filename}:{record.lineno}:{record.funcName}()] {record.msg}'
 		else:
 			msg = record.msg
 		if record.levelno == logging.ERROR:
@@ -20,7 +20,7 @@ class ConsoleFormatter(logging.Formatter):
 		if record.levelno == logging.DEBUG:
 			front = colored('  DEBUG: ', 'green')
 
-		msg = '%s%s' % (front, msg)
+		msg = f'{front}{msg}'
 
 		record.msg = msg
 

@@ -36,24 +36,18 @@ class Ceph():
 
 	def __esc(self, snap):
 		if self.esc is True:
-			return "'%s'" % (snap,)
+			return f"'{snap}'"
 		else:
 			return snap
+
+	def __info(self, image):
+		return self.__fetch('info', image)
 
 	def ls(self):
 		return self.__fetch('ls')
 
-	def lsclone(self, image, snap):
-		return self.__fetch('children', image, '--snap', snap)
-
 	def du(self, image):
 		return self.__fetch('du', image)
-
-	def info(self, image, snap=None):
-		if snap is None:
-			return self.__fetch('info', image)
-		else:
-			return self.__fetch('info', image, '--snap', snap)
 
 	def snap(self, image):
 		snap = self.__fetch('snap', 'ls', image)
@@ -61,24 +55,24 @@ class Ceph():
 		snap = [i for i in snap if i.startswith(config['snap_prefix'])]
 		return snap
 
-	def protect(self, image, snap):
-		info = self.info(image, snap)
+	def protect(self, extsnap):
+		info = self.__info(extsnap)
 		if info['protected'] == 'true':
 			return
-		self('snap', 'protect', image, '--snap', snap)
+		self('snap', 'protect', extsnap)
 
-	def unprotect(self, image, snap):
-		info = self.info(image, snap)
+	def unprotect(self, extsnap):
+		info = self.__info(extsnap)
 		if info['protected'] == 'false':
 			return
-		self('snap', 'unprotect', image, '--snap', snap)
+		self('snap', 'unprotect', extsnap)
 
-	def clone(self, image, snap):
+	def clone(self, extsnap):
 		for i in range(1, 100):
-			clone = 'restore-%s' % (i,)
+			clone = f'restore-{i}'
 			if not self.exists(clone):
 				break
-		self('clone', image, '--snap', snap, '%s/%s' % (self.pool, clone))
+		self('clone', extsnap, f'{self.pool}/{clone}')
 		return clone
 
 	def get_mapped(self):
@@ -90,11 +84,11 @@ class Ceph():
 			mapped = mapped.split(' ')
 			mapped = [i for i in mapped if i != '']
 
-			parent = self.info(mapped[2])['parent']
+			parent = self.__info(mapped[2])['parent']
 			dev = mapped[-2].replace('/dev/', '')
 			for mount in open('/proc/mounts').readlines():
 				mount = mount.rstrip('\n')
-				if not mount.startswith('/dev/mapper/%s' % (dev,)) and not mount.startswith('/dev/%s' % (dev,)):
+				if not mount.startswith(f'/dev/mapper/{dev}') and not mount.startswith(f'/dev/{dev}'):
 					# We do not found a mountpoint, set it to None
 					# to avoid polluting the output
 					mount = None
@@ -135,24 +129,24 @@ class Ceph():
 		sh.Command('rbd-nbd')('unmap', dev)
 
 	def rm(self, image):
-		Log.debug('Deleting image %s ..' % (image,))
+		Log.debug(f'Deleting image {image} ..')
 		try:
 			self('rm', image)
 		except sh.ErrorReturnCode:
-			Log.debug('%s cannot be removed, maybe someone mapped it' % (image,))
+			Log.debug(f'{image} cannot be removed, maybe someone mapped it')
 
 	def rm_snap(self, image, snap):
-		Log.debug('Deleting snapshot %s@%s .. ' % (image, snap))
+		Log.debug(f'Deleting snapshot {image}@{snap} .. ')
 		snap = self.__esc(snap)
 		try:
 			self('snap', 'rm', '--snap', snap, image)
 		except sh.ErrorReturnCode:
-			Log.debug('Cannot rm %s@%s, may be held by something' % (image, snap))
+			Log.debug(f'Cannot rm {image}@{snap}, may be held by something')
 
 	def mk_snap(self, image, snap, vm=None):
 		snap = self.__esc(snap)
 
-		Log.debug('Creating snapshot %s@%s .. ' % (image, snap))
+		Log.debug(f'Creating snapshot {image}@{snap} .. ')
 
 		if vm is None:
 			self('snap', 'create', '--snap', snap, image)
@@ -182,9 +176,9 @@ class Ceph():
 
 		if config['download_compression'] is True:
 			export += ['|', 'gzip']
-			imp = 'gunzip | %s import-diff --no-progress - "%s"' % (self.backup.cmd, dest)
+			imp = f'gunzip | {self.backup.cmd} import-diff --no-progress - "{dest}"'
 		else:
-			imp = '%s import-diff --no-progress - "%s"' % (self.backup.cmd, dest)
+			imp = f'{self.backup.cmd} import-diff --no-progress - "{dest}"'
 
 		p1 = Popen(export, stdout=PIPE)
 
@@ -224,7 +218,7 @@ class Ceph():
 				continue
 
 			if found is True:
-				Log.error('%s matches %s, but we already found a match' % (i, dest))
+				Log.error(f'{i} matches {dest}, but we already found a match')
 			found = True
 			self('mv', i, dest)
 

@@ -16,6 +16,7 @@ class Restore():
 
 		self.rbd = rbd
 		self.snap = snap
+		self.extsnap = f'{self.rbd}@{self.snap}'
 
 	def list_mapped(self):
 		return self.ceph.get_mapped()
@@ -55,33 +56,33 @@ class Restore():
 			# len(..) == 2 -> only one partition is found
 			if len(maps.split('\n')) != 2:
 				Log.info('You can now:')
-				Log.info('\tmount /dev/mapper/%spX %s' % (nbd, self.tmp_dir))
-				Log.info('\t# Inspect %s and look at your files' % (self.tmp_dir,))
+				Log.info(f'\tmount /dev/mapper/{nbd}pX {self.tmp_dir}')
+				Log.info(f'\t# Inspect {self.tmp_dir} and look at your files')
 				return
-			part = '/dev/mapper/%sp1' % (nbd,)
+			part = f'/dev/mapper/{nbd}p1'
 
 		time.sleep(0.5)
 		try:
 			sh.Command('mount')(part, self.tmp_dir)
-			Log.info('Please find our files in %s' % (self.tmp_dir,))
+			Log.info(f'Please find our files in {self.tmp_dir}')
 			return self.tmp_dir
 		except Exception:
-			Log.warning('mount %s %s failed' % (part, self.tmp_dir))
+			Log.warning(f'mount {part} {self.tmp_dir} failed')
 
 	def mount(self):
-		Log.info('Mapping %s@%s ..' % (self.rbd, self.snap))
+		Log.info(f'Mapping {self.extsnap} ..')
 		for i in self.ceph.get_mapped():
 			if i['parent_image'] != self.rbd or i['parent_snap'] != self.snap:
 				continue
-			Log.info('Already mapped on %s, and possibly mounted on %s' % (i['dev'], i['mountpoint']))
+			Log.info(f'Already mapped on {i["dev"]}, and possibly mounted on {i["mountpoint"]}')
 			return i['mountpoint']
 
-		self.ceph.protect(self.rbd, self.snap)
-		clone = self.ceph.clone(self.rbd, self.snap)
+		self.ceph.protect(self.extsnap)
+		clone = self.ceph.clone(self.extsnap)
 		self.dev = self.ceph.map(clone)
 
 		if self.dev is None:
-			Log.error('Cannot map %s (cloned from %s@%s)' % (clone, self.rbd, self.snap))
+			Log.error(f'Cannot map {clone} (cloned from {self.extsnap})')
 			return
 
 		kpartx = False
@@ -113,19 +114,19 @@ class Restore():
 			pass
 
 	def umount(self):
-		Log.info('Unmapping %s@%s ..' % (self.rbd, self.snap))
+		Log.info(f'Unmapping {self.extsnap} ..')
 		for i in self.ceph.get_mapped():
 			if i['parent_image'] != self.rbd or i['parent_snap'] != self.snap:
 				continue
-			Log.info('%s@%s currently mapped on %s' % (self.rbd, self.snap, i['dev']))
+			Log.info(f'{self.extsnap} currently mapped on {i["dev"]}')
 			if i['mountpoint'] is not None:
 				try:
 					sh.Command('umount')(i['mountpoint'])
 				except sh.ErrorReturnCode:
-					Log.warning('Cannot umount %s, maybe someone is using it ?' % (i['mountpoint'],))
+					Log.warning(f'Cannot umount {i["mountpoint"]}, maybe someone is using it ?')
 					continue
 				os.rmdir(i['mountpoint'])
 			sh.Command('kpartx')('-dv', i['dev'])
 			self.ceph.unmap(i['dev'])
 			self.ceph.rm(i['image'])
-			self.ceph.unprotect(self.rbd, self.snap)
+			self.ceph.unprotect(self.extsnap)

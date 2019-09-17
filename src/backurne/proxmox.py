@@ -2,6 +2,7 @@ import re
 from .config import config
 from .log import log as Log
 from .ceph import Ceph
+from .backup import Bck
 from proxmoxer import ProxmoxAPI
 
 
@@ -53,7 +54,11 @@ class Proxmox():
 				tmp[i['key']] = i['value']
 			vm['config'] = tmp
 			vm['smbios'] = self.get_smbios(vm['config'])
-			vm['to_backup'] = self.get_disks(vm['config'])
+			vm['to_backup'] = []
+			for disk in self.get_disks(vm['config']):
+				ceph = self.ceph_storage[disk['ceph']]
+				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
+				vm['to_backup'].append([disk, ceph, bck])
 			if 'agent' in vm['config']:
 				vm['qemu_agent'] = vm['config']['agent']
 			vms.append(vm)

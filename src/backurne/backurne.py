@@ -88,9 +88,7 @@ class CheckProxmox(Check):
 	def check(self):
 		data = list()
 		for vm in self.px.vms():
-			for disk in vm['to_backup']:
-				ceph = self.px.ceph_storage[disk['ceph']]
-				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
+			for disk, ceph, bck in vm['to_backup']:
 				data.append({'ceph': ceph, 'backup': bck, 'image': disk['rbd']})
 
 		self.err = list()
@@ -102,9 +100,7 @@ class CheckProxmox(Check):
 
 	def check_snap(self):
 		for vm in self.px.vms():
-			for disk in vm['to_backup']:
-				ceph = self.px.ceph_storage[disk['ceph']]
-				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
+			for disk, ceph, bck in vm['to_backup']:
 				self.cmp_snap(bck, ceph, disk['rbd'])
 		return self.err
 
@@ -159,7 +155,7 @@ class Backup:
 		todo = list()
 
 		try:
-			with Lock(bck.build_dest()):
+			with Lock(bck.dest):
 				for profile, value in profiles:
 					self.status_queue.put('add_item')
 					if not bck.check_profile(profile):
@@ -198,7 +194,7 @@ class Backup:
 			bck = Bck(self.cluster['name'], ceph, disk)
 			rbd = disk
 
-		backups = Ceph(None).backup.snap(bck.build_dest())
+		backups = Ceph(None).backup.snap(bck.dest)
 
 		snaps = ceph.snap(rbd)
 		shared = list(set(backups).intersection(snaps))
@@ -328,10 +324,9 @@ class BackupProxmox(Backup):
 
 	def list(self):
 		px = Proxmox(self.cluster)
-		vms = px.vms()
 
 		result = list()
-		for vm in vms:
+		for vm in px.vms():
 			if vm['smbios'] is None and self.cluster['use_smbios'] is True:
 				if config['uuid_fallback'] is False:
 					Log.warning('No smbios found, skipping')
@@ -349,9 +344,7 @@ class BackupProxmox(Backup):
 			# and we must not keep the VM frozen more than necessary
 			px.freeze(vm['node'], vm)
 
-			for disk in vm['to_backup']:
-				ceph = px.ceph_storage[disk['ceph']]
-				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
+			for disk, ceph, bck in vm['to_backup']:
 				profiles = self.__fetch_profiles(vm, disk)
 				self._create_snap(bck, profiles)
 
@@ -360,12 +353,9 @@ class BackupProxmox(Backup):
 			Log.error(e)
 
 	def expire_item(self, vm):
-		px = Proxmox(self.cluster)
 		try:
-			for disk in vm['to_backup']:
-				ceph = px.ceph_storage[disk['ceph']]
-				bck = Bck(disk['ceph'], ceph, disk['rbd'], vm=vm, adapter=disk['adapter'])
-				with Lock(bck.build_dest()):
+			for disk, ceph, bck in vm['to_backup']:
+				with Lock(bck.dest):
 					self._expire_item(ceph, disk, vm)
 		except filelock.Timeout as e:
 			Log.debug(e)
@@ -384,7 +374,10 @@ class BackupPlain(Backup):
 	def create_snap(self, rbd):
 		setproctitle.setproctitle('Backurne idle producer')
 		bck = Bck(self.cluster['name'], self.ceph, rbd)
-		self._create_snap(bck, config['profiles'].items())
+		try:
+			self._create_snap(bck, config['profiles'].items())
+		except Exception as e:
+			Log.error(e)
 
 	def expire_item(self, item):
 		try:
@@ -422,7 +415,7 @@ class Status_updater:
 
 		def __update(self):
 			done = self.total - self.todo
-			msg = f'Backurne : %s/%s {self.desc}' % (done, self.total)
+			msg = f'Backurne : {done}/{self.total} {self.desc}'
 			setproctitle.setproctitle(msg)
 			if config['log_level'] != 'debug':
 				self.bar.maxval = self.total
@@ -458,6 +451,7 @@ class Status_updater:
 
 	def __exit__(self, type, value, traceback):
 		self.real_updater.terminate()
+		print('')
 
 
 class Lock:
@@ -493,14 +487,14 @@ class Producer:
 		for i in range(0, config['live_worker']):
 			try:
 				self.queue.put(None)
-			except:
+			except Exception:
 				Log.error('cannot end a live_worker! This is a critical bug, we will never die')
 
 		Log.debug('Producer ended')
 
 	def __work__(self):
 		for cluster in config['live_clusters']:
-			Log.debug('Backuping %s: %s' % (cluster['type'], cluster['name']))
+			Log.debug(f'Backuping {cluster["type"]}: {cluster["name"]}')
 			if cluster['type'] == 'proxmox':
 				bidule = BackupProxmox(cluster, self.queue, self.status_queue)
 			else:

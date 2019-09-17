@@ -15,13 +15,13 @@ class Bck():
 
 		self.source = f'{self.name}:{self.rbd}'
 
-		self.dest = self.build_dest()
+		self.dest = self.__build_dest()
 
 		# Store here the last snapshot created via this object
 		# It is not yet on the backup cluster
 		self.last_created_snap = None
 
-	def build_dest(self):
+	def __build_dest(self):
 		ident = self.name
 		comment = None
 
@@ -42,6 +42,16 @@ class Bck():
 		name = f'{config["snap_prefix"]};{name}'
 		return name
 
+	def __last_snap_profile(self, profile):
+		snaps = self.ceph.backup.snap(self.dest)
+		good = list()
+		for snap in snaps:
+			split = snap.split(';')
+			if split[1] != profile:
+				continue
+			good.append(snap)
+		return self.ceph.get_last_snap(good)
+
 	def dl_snap(self, snap_name, dest, last_snap):
 		Log.debug(f'Exporting {self.source}')
 		if not self.ceph.backup.exists(dest):
@@ -52,18 +62,9 @@ class Bck():
 		self.ceph.do_backup(self.rbd, snap_name, dest, last_snap)
 		Log.debug(f'Export {self.source} complete')
 
-	def last_snap_profile(self, snaps, profile):
-		good = list()
-		for snap in snaps:
-			split = snap.split(';')
-			if split[1] != profile:
-				continue
-			good.append(snap)
-		return self.ceph.get_last_snap(good)
-
 	def check_profile(self, profile):
 		try:
-			last_profile = self.last_snap_profile(self.ceph.backup.snap(self.dest), profile)
+			last_profile = self.__last_snap_profile(profile)
 		except Exception:
 			# Image does not exists ?
 			return True
