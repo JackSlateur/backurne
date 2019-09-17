@@ -111,9 +111,16 @@ class CheckPlain(Check):
 		self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'])
 
 	def check(self):
+		data = list()
 		for rbd in self.ceph.ls():
 			bck = Bck(self.cluster['name'], self.ceph, rbd)
-			self.check_img(self.ceph, bck, rbd)
+			data.append({'ceph': self.ceph, 'backup': bck, 'image': rbd})
+
+		self.err = list()
+		with multiprocessing.Pool() as pool:
+			for msg in pool.imap_unordered(self.check_img, data):
+				self.add_err(msg)
+
 		return self.err
 
 	def check_snap(self):
@@ -379,11 +386,15 @@ class BackupPlain(Backup):
 		except Exception as e:
 			Log.error(e)
 
-	def expire_item(self, item):
+	def expire_item(self, rbd):
 		try:
-			self._expire_item(self.ceph, item)
+			bck = Bck(self.cluster['name'], self.ceph, rbd)
+			with Lock(bck.dest):
+				self._expire_item(self.ceph, rbd)
+		except filelock.Timeout as e:
+			Log.debug(e)
 		except Exception as e:
-			Log.warning(f'{e} thrown while expiring live {item}')
+			Log.warning(f'{e} thrown while expiring live {rbd}')
 
 
 class Status_updater:
