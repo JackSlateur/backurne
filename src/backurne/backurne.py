@@ -289,6 +289,8 @@ class Backup:
 					ceph.backup.rm(image)
 		except filelock.Timeout:
 			pass
+		except Exception as e:
+			Log.warning(e)
 
 
 class BackupProxmox(Backup):
@@ -330,22 +332,25 @@ class BackupProxmox(Backup):
 		return profiles
 
 	def list(self):
-		px = Proxmox(self.cluster)
-
 		result = list()
-		for vm in px.vms():
-			if vm['smbios'] is None and self.cluster['use_smbios'] is True:
-				if config['uuid_fallback'] is False:
-					Log.warning('No smbios found, skipping')
-					continue
-			result.append(vm)
+
+		try:
+			px = Proxmox(self.cluster)
+			for vm in px.vms():
+				if vm['smbios'] is None and self.cluster['use_smbios'] is True:
+					if config['uuid_fallback'] is False:
+						Log.warning('No smbios found, skipping')
+						continue
+				result.append(vm)
+		except Exception as e:
+			Log.error(f'{e} thrown while listing vm on {self.cluster["name"]}')
 		return result
 
 	def create_snap(self, vm):
 		setproctitle.setproctitle('Backurne idle producer')
-		px = Proxmox(self.cluster)
 
 		try:
+			px = Proxmox(self.cluster)
 			# We freeze the VM once, thus create all snaps at the same time
 			# Exports are done after thawing, because it it time-consuming,
 			# and we must not keep the VM frozen more than necessary
@@ -413,16 +418,16 @@ class Status_updater:
 				self.bar = progressbar.ProgressBar(maxval=1, widgets=widget)
 
 		def __call__(self):
-			Log.debug('Real_updater started')
-			if config['log_level'] != 'debug':
-				self.bar.start()
 			try:
+				Log.debug('Real_updater started')
+				if config['log_level'] != 'debug':
+					self.bar.start()
 				self.__work__()
+				if config['log_level'] != 'debug':
+					self.bar.finish()
+				Log.debug('Real_updater ended')
 			except Exception as e:
 				Log.error(e)
-			if config['log_level'] != 'debug':
-				self.bar.finish()
-			Log.debug('Real_updater ended')
 
 		def __update(self):
 			done = self.total - self.todo
@@ -487,19 +492,18 @@ class Producer:
 
 	def __call__(self):
 		Log.debug('Producer started')
-		setproctitle.setproctitle('Backurne Producer')
 		try:
+			setproctitle.setproctitle('Backurne Producer')
 			self.__work__()
+			# We send one None per live_worker
+			# That way, all of them shall die
+			for i in range(0, config['live_worker']):
+				try:
+					self.queue.put(None)
+				except Exception:
+					Log.error('cannot end a live_worker! This is a critical bug, we will never die')
 		except Exception as e:
 			Log.error(e)
-
-		# We send one None per live_worker
-		# That way, all of them shall die
-		for i in range(0, config['live_worker']):
-			try:
-				self.queue.put(None)
-			except Exception:
-				Log.error('cannot end a live_worker! This is a critical bug, we will never die')
 
 		Log.debug('Producer ended')
 
@@ -519,9 +523,9 @@ class Consumer:
 		self.status_queue = status_queue
 
 	def __call__(self):
-		setproctitle.setproctitle('Backurne Consumer')
 		Log.debug('Consumer started')
 		try:
+			setproctitle.setproctitle('Backurne Consumer')
 			self.__work__()
 		except Exception as e:
 			Log.error(e)
