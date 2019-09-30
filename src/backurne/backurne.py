@@ -413,9 +413,11 @@ class Status_updater:
 			if config['log_level'] != 'debug':
 				# progressbar uses signal.SIGWINCH
 				# It messes with multiprocessing, so we break it
+				real_signal = signal.signal
 				signal.signal = None
 				widget = [progressbar.widgets.SimpleProgress(), ' ', desc, ' (', progressbar.widgets.Timer(), ')']
 				self.bar = progressbar.ProgressBar(maxval=1, widgets=widget)
+				signal.signal = real_signal
 
 		def __call__(self):
 			try:
