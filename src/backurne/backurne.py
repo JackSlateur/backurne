@@ -23,6 +23,9 @@ from .backup import Bck
 from . import stats
 
 
+VERSION = '0.2'
+
+
 class Check:
 	def __init__(self, cluster):
 		self.cluster = cluster
@@ -613,6 +616,7 @@ def get_args():
 	sub.add_parser('check')
 	sub.add_parser('check-snap')
 	sub.add_parser('stats')
+	sub.add_parser('version')
 
 	ls = sub.add_parser('list-mapped')
 	ls.add_argument('--json', action='store_true')
@@ -635,6 +639,8 @@ def main():
 	args = get_args()
 	if args.action == 'stats':
 		stats.print_stats()
+	elif args.action == 'version':
+		print(f'Backurne version {VERSION}')
 	elif args.action == 'check':
 		print_check_results()
 	elif args.action in ('precheck', 'check-snap'):
