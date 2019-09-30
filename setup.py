@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setuptools.setup(
 	name='backurne',
-	version='0.2',
+	version='1.0.0',
 	author='Alexandre Bruyelles',
 	author_email='backurne@jack.fr.eu.org',
 	description="Backup Ceph's RBD on Ceph, with Proxmox integration",
@@ -27,5 +27,5 @@ setuptools.setup(
 	python_requires='>=3.5',
 	install_requires=['termcolor', 'PTable', 'requests',
 			'proxmoxer', 'sh', 'python-dateutil', 'filelock',
-                        'setproctitle', 'progressbar'],
+			'setproctitle', 'progressbar'],
 )
