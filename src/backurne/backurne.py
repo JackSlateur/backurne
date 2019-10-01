@@ -23,7 +23,7 @@ from .backup import Bck
 from . import stats
 
 
-VERSION = '0.2'
+VERSION = '1.0.0'
 
 
 class Check:
