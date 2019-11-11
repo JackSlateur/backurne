@@ -12,6 +12,7 @@ import signal
 import sqlite3
 import time
 import queue
+from functools import wraps
 
 from . import pretty
 from .config import config
@@ -26,6 +27,18 @@ from . import stats
 VERSION = '1.0.0'
 
 
+def handle_exc(func):
+	@wraps(func)
+	def wrapper(*args, **kwargs):
+		try:
+			return func(*args, **kwargs)
+		except filelock.Timeout as e:
+			Log.debug(e)
+		except Exception as e:
+			Log.warning(f'{e} thrown while running {func.__name__}()')
+	return wrapper
+
+
 class Check:
 	def __init__(self, cluster):
 		self.cluster = cluster
@@ -37,30 +50,28 @@ class Check:
 		msg['cluster'] = self.cluster['name']
 		self.err.append(msg)
 
+	@handle_exc
 	def check_img(self, args):
-		try:
-			ceph = args['ceph']
-			backup = args['backup']
-			rbd = args['image']
+		ceph = args['ceph']
+		backup = args['backup']
+		rbd = args['image']
 
-			if not ceph.backup.exists(backup.dest):
-				msg = f'No backup found for {rbd} (image does not exists)'
-				return {'image': rbd, 'msg': msg}
+		if not ceph.backup.exists(backup.dest):
+			msg = f'No backup found for {rbd} (image does not exists)'
+			return {'image': rbd, 'msg': msg}
 
-			last = ceph.get_last_shared_snap(rbd, backup.dest)
-			if last is None:
-				msg = f'No backup found for {rbd} (no shared snap)'
-				return {'image': rbd, 'msg': msg}
+		last = ceph.get_last_shared_snap(rbd, backup.dest)
+		if last is None:
+			msg = f'No backup found for {rbd} (no shared snap)'
+			return {'image': rbd, 'msg': msg}
 
-			when = last.split(';')[3]
-			when = dateutil.parser.parse(when)
-			deadline = datetime.timedelta(days=1) + datetime.timedelta(hours=6)
-			deadline = datetime.datetime.now() - deadline
-			if when < deadline:
-				msg = f'Backup found for {rbd}, yet too old (created at {when})'
-				return {'image': rbd, 'msg': msg}
-		except Exception as e:
-			Log.warning(f'{e} thrown while checking {args}')
+		when = last.split(';')[3]
+		when = dateutil.parser.parse(when)
+		deadline = datetime.timedelta(days=1) + datetime.timedelta(hours=6)
+		deadline = datetime.datetime.now() - deadline
+		if when < deadline:
+			msg = f'Backup found for {rbd}, yet too old (created at {when})'
+			return {'image': rbd, 'msg': msg}
 
 	def cmp_snap(self, backup, ceph, rbd):
 		live_snaps = ceph.snap(rbd)
@@ -258,42 +269,38 @@ class Backup:
 			for i in pool.imap_unordered(self.expire_item, items):
 				pass
 
+	@handle_exc
 	def expire_backup(i):
 		ceph = i['ceph']
 		image = i['image']
 		i['status_queue'].put('done_item')
 
-		try:
-			with Lock(image):
-				snaps = ceph.backup.snap(image)
-				try:
-					# Pop the last snapshot
-					# We will take care of it later
-					last = snaps.pop()
-				except IndexError:
-					# We found an image without snapshot
-					# Someone is messing around, or this is a bug
-					# Anyway, the image can be deleted
-					ceph.backup.rm(image)
-					return
+		with Lock(image):
+			snaps = ceph.backup.snap(image)
+			try:
+				# Pop the last snapshot
+				# We will take care of it later
+				last = snaps.pop()
+			except IndexError:
+				# We found an image without snapshot
+				# Someone is messing around, or this is a bug
+				# Anyway, the image can be deleted
+				ceph.backup.rm(image)
+				return
 
-				for snap in snaps:
-					if not Backup.is_expired(snap):
-						continue
-					ceph.backup.rm_snap(image, snap)
+			for snap in snaps:
+				if not Backup.is_expired(snap):
+					continue
+				ceph.backup.rm_snap(image, snap)
 
-				snaps = ceph.backup.snap(image)
-				if len(snaps) == 1:
-					if Backup.is_expired(last, last=True):
-						ceph.backup.rm_snap(image, snaps[0])
+			snaps = ceph.backup.snap(image)
+			if len(snaps) == 1:
+				if Backup.is_expired(last, last=True):
+					ceph.backup.rm_snap(image, snaps[0])
 
-				if len(ceph.backup.snap(image)) == 0:
-					Log.debug(f'{image} has no snapshot left, deleting')
-					ceph.backup.rm(image)
-		except filelock.Timeout:
-			pass
-		except Exception as e:
-			Log.warning(e)
+			if len(ceph.backup.snap(image)) == 0:
+				Log.debug(f'{image} has no snapshot left, deleting')
+				ceph.backup.rm(image)
 
 
 class BackupProxmox(Backup):
@@ -349,33 +356,27 @@ class BackupProxmox(Backup):
 			Log.error(f'{e} thrown while listing vm on {self.cluster["name"]}')
 		return result
 
+	@handle_exc
 	def create_snap(self, vm):
 		setproctitle.setproctitle('Backurne idle producer')
 
-		try:
-			px = Proxmox(self.cluster)
-			# We freeze the VM once, thus create all snaps at the same time
-			# Exports are done after thawing, because it it time-consuming,
-			# and we must not keep the VM frozen more than necessary
-			px.freeze(vm['node'], vm)
+		px = Proxmox(self.cluster)
+		# We freeze the VM once, thus create all snaps at the same time
+		# Exports are done after thawing, because it it time-consuming,
+		# and we must not keep the VM frozen more than necessary
+		px.freeze(vm['node'], vm)
 
-			for disk, ceph, bck in vm['to_backup']:
-				profiles = self.__fetch_profiles(vm, disk)
-				self._create_snap(bck, profiles)
+		for disk, ceph, bck in vm['to_backup']:
+			profiles = self.__fetch_profiles(vm, disk)
+			self._create_snap(bck, profiles)
 
-			px.thaw(vm['node'], vm)
-		except Exception as e:
-			Log.error(e)
+		px.thaw(vm['node'], vm)
 
+	@handle_exc
 	def expire_item(self, vm):
-		try:
-			for disk, ceph, bck in vm['to_backup']:
-				with Lock(bck.dest):
-					self._expire_item(ceph, disk, vm)
-		except filelock.Timeout as e:
-			Log.debug(e)
-		except Exception as e:
-			Log.warning(f'{e} thrown while expiring live {vm}')
+		for disk, ceph, bck in vm['to_backup']:
+			with Lock(bck.dest):
+				self._expire_item(ceph, disk, vm)
 
 
 class BackupPlain(Backup):
@@ -386,23 +387,17 @@ class BackupPlain(Backup):
 	def list(self):
 		return self.ceph.ls()
 
+	@handle_exc
 	def create_snap(self, rbd):
 		setproctitle.setproctitle('Backurne idle producer')
 		bck = Bck(self.cluster['name'], self.ceph, rbd)
-		try:
-			self._create_snap(bck, config['profiles'].items())
-		except Exception as e:
-			Log.error(e)
+		self._create_snap(bck, config['profiles'].items())
 
+	@handle_exc
 	def expire_item(self, rbd):
-		try:
-			bck = Bck(self.cluster['name'], self.ceph, rbd)
-			with Lock(bck.dest):
-				self._expire_item(self.ceph, rbd)
-		except filelock.Timeout as e:
-			Log.debug(e)
-		except Exception as e:
-			Log.warning(f'{e} thrown while expiring live {rbd}')
+		bck = Bck(self.cluster['name'], self.ceph, rbd)
+		with Lock(bck.dest):
+			self._expire_item(self.ceph, rbd)
 
 
 class Status_updater:
@@ -422,17 +417,15 @@ class Status_updater:
 				self.bar = progressbar.ProgressBar(maxval=1, widgets=widget)
 				signal.signal = real_signal
 
+		@handle_exc
 		def __call__(self):
-			try:
-				Log.debug('Real_updater started')
-				if config['log_level'] != 'debug':
-					self.bar.start()
-				self.__work__()
-				if config['log_level'] != 'debug':
-					self.bar.finish()
-				Log.debug('Real_updater ended')
-			except Exception as e:
-				Log.error(e)
+			Log.debug('Real_updater started')
+			if config['log_level'] != 'debug':
+				self.bar.start()
+			self.__work__()
+			if config['log_level'] != 'debug':
+				self.bar.finish()
+			Log.debug('Real_updater ended')
 
 		def __update(self):
 			done = self.total - self.todo
@@ -495,20 +488,18 @@ class Producer:
 		self.queue = queue
 		self.status_queue = status_queue
 
+	@handle_exc
 	def __call__(self):
 		Log.debug('Producer started')
-		try:
-			setproctitle.setproctitle('Backurne Producer')
-			self.__work__()
-			# We send one None per live_worker
-			# That way, all of them shall die
-			for i in range(0, config['live_worker']):
-				try:
-					self.queue.put(None)
-				except Exception:
-					Log.error('cannot end a live_worker! This is a critical bug, we will never die')
-		except Exception as e:
-			Log.error(e)
+		setproctitle.setproctitle('Backurne Producer')
+		self.__work__()
+		# We send one None per live_worker
+		# That way, all of them shall die
+		for i in range(0, config['live_worker']):
+			try:
+				self.queue.put(None)
+			except Exception:
+				Log.error('cannot end a live_worker! This is a critical bug, we will never die')
 
 		Log.debug('Producer ended')
 
@@ -527,13 +518,11 @@ class Consumer:
 		self.queue = queue
 		self.status_queue = status_queue
 
+	@handle_exc
 	def __call__(self):
 		Log.debug('Consumer started')
-		try:
-			setproctitle.setproctitle('Backurne Consumer')
-			self.__work__()
-		except Exception as e:
-			Log.error(e)
+		setproctitle.setproctitle('Backurne Consumer')
+		self.__work__()
 		Log.debug('Consumer ended')
 
 	def __work__(self):
