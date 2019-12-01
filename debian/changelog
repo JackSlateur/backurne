@@ -1,3 +1,9 @@
+backurne (1.1.0) UNRELEASED; urgency=medium
+
+  * Add hook support
+
+ -- Alexandre Bruyelles <backurne@jack.fr.eu.org>  Mon, 01 Dec 2019 13:40:19 +0100
+
 backurne (1.0.0) UNRELEASED; urgency=medium
 
   * First release

@@ -1,3 +1,8 @@
+Version 1.1.0
+
+**Notable changes** :
+ * **Backurne** now supports a hook infrastructure. Action can be performed before and after specific event : for instance, stopping a database slave before backup, and starting it after.
+
 Version 1.0.0
 
 This version is centered around ease of use and reporting. The core algorithm has not changed much, but the release is supposed to be easier for people to use, simplier to understand etc.

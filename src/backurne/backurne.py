@@ -25,7 +25,7 @@ from .backup import Bck
 from . import stats
 
 
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 
 
 def handle_exc(func):
