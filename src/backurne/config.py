@@ -36,6 +36,12 @@ def load_config():
 		'hash_binary': '/usr/bin/md5sum',
 		'check_db': '/tmp/backurne.db',
 		'lockdir': '/var/lock/backurne',
+		'hooks': {
+			'pre_vm': None,
+			'pre_disk': None,
+			'post_disk': None,
+			'post_vm': None,
+		},
 	}
 
 	custom = imp.new_module('custom')

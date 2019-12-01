@@ -8,6 +8,7 @@ import multiprocessing
 import progressbar
 import requests
 import setproctitle
+import sh
 import signal
 import sqlite3
 import time
@@ -144,6 +145,11 @@ class CheckPlain(Check):
 		return self.err
 
 
+def run_hook(kind, vmname, diskname):
+	if config['hooks'][kind] is not None:
+		sh.Command(config['hooks'][kind])(kind, vmname, diskname)
+
+
 class Backup:
 	def __init__(self, cluster, queue, status_queue):
 		self.cluster = cluster
@@ -172,8 +178,10 @@ class Backup:
 			return False
 		return True
 
-	def _create_snap(self, bck, profiles):
+	def _create_snap(self, bck, profiles, pre_vm_hook):
 		todo = list()
+
+		hooked = False
 
 		try:
 			with Lock(bck.dest):
@@ -183,8 +191,30 @@ class Backup:
 						self.status_queue.put('done_item')
 						continue
 
+					if pre_vm_hook is False:
+						try:
+							run_hook('pre_vm', bck.vm['name'], bck.rbd)
+						except Exception as e:
+							out = e.stdout.decode('utf-8') + e.stderr.decode('utf-8').rstrip()
+							Log.warn('pre_vm hook failed on %s/%s with code %s : %s' % (bck.vm['name'], bck.rbd, e.exit_code, out))
+							self.status_queue.put('done_item')
+							return None
+						hooked = True
+
+					try:
+						run_hook('pre_disk', bck.vm['name'], bck.rbd)
+					except Exception as e:
+						out = e.stdout.decode('utf-8') + e.stderr.decode('utf-8').rstrip()
+						Log.warn('pre_disk hook failed on %s/%s with code %s : %s' % (bck.vm['name'], bck.rbd, e.exit_code, out))
+						self.status_queue.put('done_item')
+						continue
 					setproctitle.setproctitle(f'Backurne: snapshooting {bck.rbd} on {bck.name}')
 					dest, last_snap, snap_name = bck.make_snap(profile, value['count'])
+
+					try:
+						run_hook('post_disk', bck.vm['name'], bck.rbd)
+					except:
+						pass
 					if dest is not None:
 						todo.append({
 							'dest': dest,
@@ -197,6 +227,7 @@ class Backup:
 		if len(todo) != 0:
 			self.queue.put(todo)
 		setproctitle.setproctitle('Backurne idle producer')
+		return hooked
 
 	def create_snaps(self):
 		items = self.list()
@@ -366,9 +397,20 @@ class BackupProxmox(Backup):
 		# and we must not keep the VM frozen more than necessary
 		px.freeze(vm['node'], vm)
 
+		pre_vm_hook = False
+
 		for disk, ceph, bck in vm['to_backup']:
 			profiles = self.__fetch_profiles(vm, disk)
-			self._create_snap(bck, profiles)
+			hooked = self._create_snap(bck, profiles, pre_vm_hook)
+			if hooked is None:
+				# pre_vm hook failed, we skip all its disks
+				break
+
+			if hooked is True:
+				pre_vm_hook = True
+
+		if pre_vm_hook is True:
+			run_hook('post_vm', bck.vm['name'], bck.rbd)
 
 		px.thaw(vm['node'], vm)
 

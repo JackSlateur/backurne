@@ -19,6 +19,7 @@ Supported features
 - A couple of backups can be stored on the live clusters, for faster recovery.
 - Optional **fsfreeze** support (proxmox-only) via Qemu-quest-agent.
 - Backup deactivation via Proxmox's web interface.
+- External custom processing via hooks
 
 - VM tracking, for those who uses a single Proxmox cluster with multiple Ceph backend.
 
