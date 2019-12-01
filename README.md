@@ -83,6 +83,6 @@ Note
 ---
 On Proxmox, LXC is not yet supported. Only Qemu so far :/
 
-The project is developed mainly for Debian Stretch and Proxmox, and is used here on these technologies.\
+The project is developed mainly for Debian Buster and Proxmox, and is used here on these technologies.\
 The "plain" feature as well as running `backurne` on other operating system is less tested, and may be less bug-proof.\
 Bug report, merge requests and feature requests are welcome : some stuff are not implemented simply because I do not need them, not because it cannot be done nor because I do not want to code them.
