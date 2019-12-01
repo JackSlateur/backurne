@@ -26,6 +26,9 @@ class Ceph():
 		if not is_backup:
 			self.backup = Ceph(None, is_backup=True)
 
+	def __str__(self):
+		return 'pool: %s, endpoint: %s' % (self.pool, self.endpoint)
+
 	def __call__(self, *args):
 		return self.cmd(args)
 

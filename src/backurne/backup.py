@@ -21,6 +21,9 @@ class Bck():
 		# It is not yet on the backup cluster
 		self.last_created_snap = None
 
+	def __str__(self):
+		return '%s/%s' % (self.vm['name'], self.rbd)
+
 	def __build_dest(self):
 		ident = self.name
 		comment = None
