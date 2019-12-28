@@ -22,7 +22,10 @@ class Bck():
 		self.last_created_snap = None
 
 	def __str__(self):
-		return '%s/%s' % (self.vm['name'], self.rbd)
+		if self.mv is not None:
+			return '%s/%s' % (self.vm['name'], self.rbd)
+		else:
+			return '%s/%s' % (self.name, self.rbd)
 
 	def __build_dest(self):
 		ident = self.name

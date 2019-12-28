@@ -202,7 +202,10 @@ class Backup:
 						hooked = True
 
 					try:
-						run_hook('pre_disk', bck.vm['name'], bck.rbd)
+						if bck.vm is not None:
+							run_hook('pre_disk', bck.vm['name'], bck.rbd)
+						else:
+							run_hook('pre_disk', bck.source, bck.rbd)
 					except Exception as e:
 						out = e.stdout.decode('utf-8') + e.stderr.decode('utf-8').rstrip()
 						Log.warn('pre_disk hook failed on %s/%s with code %s : %s' % (bck.vm['name'], bck.rbd, e.exit_code, out))
@@ -433,7 +436,7 @@ class BackupPlain(Backup):
 	def create_snap(self, rbd):
 		setproctitle.setproctitle('Backurne idle producer')
 		bck = Bck(self.cluster['name'], self.ceph, rbd)
-		self._create_snap(bck, config['profiles'].items())
+		self._create_snap(bck, config['profiles'].items(), True)
 
 	@handle_exc
 	def expire_item(self, rbd):
