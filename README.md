@@ -74,7 +74,7 @@ Used technology
 
  - `RBD` is the core technology used by `backurne` : it provides snapshot export, import, diff, mapping etc.
  - `ssh` is used to transfert the snapshots between the live clusters and the backup cluster. `RBD` can be manipulated over TCP/IP, but without encryption nor compression, thus this solution was not kept.
- - `md5sum` (or other, see the configuration) is used to check the consistancy between snapshots. Cryptographic properties of md5 (well ..) are not required, but this tool is the most deployed, thus is the default. Using xxHash or murmur3 is a more efficient.
+ - `xxhash` (or other, see the configuration) is used to check the consistancy between snapshots.
  - `rbd-nbd` is used to map a specific backup and inspect its content.
  - `kpartx` is used to explode partition tables into multiple block devices.
 

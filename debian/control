@@ -26,6 +26,7 @@ Depends: python3 (>= 3.6),
          ceph-common (>= 12.2.0),
          rbd-nbd (>= 12.2.0),
          kpartx,
+         xxhash,
          ${misc:Depends},
          ${python3:Depends},
          ${shlibs:Depends}

@@ -33,7 +33,7 @@ def load_config():
 		'log_level': 'debug',
 		'backup_worker': 24,
 		'live_worker': 12,
-		'hash_binary': '/usr/bin/md5sum',
+		'hash_binary': '/usr/bin/xxhsum',
 		'check_db': '/tmp/backurne.db',
 		'lockdir': '/var/lock/backurne',
 		'hooks': {
