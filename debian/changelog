@@ -1,3 +1,12 @@
+backurne (2.0.0) UNRELEASED; urgency=medium
+
+  * The `list-mapped` subcommand has been reworked to support complex mapping. Command outputs (both cli & api) has been altered to support those changes.
+  * **Backurne** now supports LVM. See README.md for its specific configuration.
+  * **Backurne** now supports vmware. Also see README.md.
+
+ -- Alexandre Bruyelles <backurne@jack.fr.eu.org>  Mon, 13 Jan 2020 13:40:19 +0100
+
+
 backurne (1.1.0) UNRELEASED; urgency=medium
 
   * Add hook support

@@ -1,3 +1,10 @@
+Version 2.0.0
+
+**Notable changes** :
+ * The `list-mapped` subcommand has been reworked to support complex mapping. Command outputs (both cli & api) has been altered to support those changes.
+ * **Backurne** now supports LVM. See README.md for its specific configuration.
+ * **Backurne** now supports vmware. Also see README.md.
+
 Version 1.1.0
 
 **Notable changes** :
