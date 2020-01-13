@@ -23,6 +23,7 @@ Depends: python3 (>= 3.6),
          python3-filelock,
          python3-setproctitle,
          python3-progressbar,
+         python3-psutil,
          ceph-common (>= 12.2.0),
          rbd-nbd (>= 12.2.0),
          kpartx,
@@ -30,8 +31,9 @@ Depends: python3 (>= 3.6),
          ${misc:Depends},
          ${python3:Depends},
          ${shlibs:Depends}
-Suggests: xxhash,
-          jq,
+Suggests: jq,
+          vmfs-tools,
+          vmfs6-tools
 Description: Backup Ceph's RBD on Ceph, with Proxmox integration
  backurne is a handy tool for backuping RBD's image on RBD.
  Yep ! What is better, for backuping a Ceph cluster, than another Ceph cluster ?

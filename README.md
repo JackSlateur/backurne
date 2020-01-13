@@ -19,7 +19,9 @@ Supported features
 - A couple of backups can be stored on the live clusters, for faster recovery.
 - Optional **fsfreeze** support (proxmox-only) via Qemu-quest-agent.
 - Backup deactivation via Proxmox's web interface.
-- External custom processing via hooks
+- External custom processing via hooks.
+- LVM support: backup's lvs are detected and mapped (if possible) for further exploration. See below.
+- vmware support: vmfs are detected and supported. Each vmdk are also mapped and mounted. See below.
 
 - VM tracking, for those who uses a single Proxmox cluster with multiple Ceph backend.
 
@@ -28,7 +30,7 @@ Encryption and compression at rest are also seamlessly supported via Bluestore O
 Required packages
 ---
 
-Core: python (>=3.6), python3-dateutil, python3-termcolor, python3-prettytable, python3-requests, python3-proxmoxer, python3-anytree (from https://github.com/c0fec0de/anytree, .deb for buster attached for convenience) \
+Core: python (>=3.6), python3-dateutil, python3-termcolor, python3-prettytable, python3-requests, python3-proxmoxer, python3-psutil, python3-anytree (from https://github.com/c0fec0de/anytree, .deb for buster attached for convenience) \
 For mapping (optional): kpartx, rbd-nbd (luminous or later)\
 For the REST API: python3-flask, python3-flask-autoindex\
 For bash autocompletion: jq
@@ -76,7 +78,25 @@ Used technology
  - `ssh` is used to transfert the snapshots between the live clusters and the backup cluster. `RBD` can be manipulated over TCP/IP, but without encryption nor compression, thus this solution was not kept.
  - `xxhash` (or other, see the configuration) is used to check the consistancy between snapshots.
  - `rbd-nbd` is used to map a specific backup and inspect its content.
- - `kpartx` is used to explode partition tables into multiple block devices.
+ - `kpartx`, `qemu-img`, `qemu-nbd`, `vmfs-tools` and `vmfs6-tools` are used for vmware exploration.
+
+
+vmware support
+---
+
+The assumption is that the rbd image you back up is a single datastore. It contains multiple vmdk, each of them is a VM disk.\
+Datastores are a specific filesystem: VMFS. There is several version, as of today. You will need `vmfs-tools` to mount VMFS up to version 5. For version 6 support, `vmfs6-tools` is required.\
+When `backurne` detects a VMFS, it will try each version until success. If no `vmfs*-tools` is avaiable, the block device is left as is.\
+Once a VMFS device is mounted, each vmdk found inside will be mapped and mounted, recursively. In theory, you could have a VMFS, with inside a VM disk (vmdk), which is itself a datastore with inside more vmdk .. This behavior is not tested, though.\
+
+
+LVM support
+---
+
+he same device may be seen at many layer by the device-mapped code.\
+To activate some LV, especially if the lives inside vmdk (see vmware support), you will need to tell LVM to allow such behavior.\
+By default, LVM refuses to activate LVs that shows up in multiple PVs.\
+To allow this, edit `/etc/lvm/lvm.conf`, and set `allow_changes_with_duplicate_pvs` to `1`.\
 
 
 Note

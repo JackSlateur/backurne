@@ -1,11 +1,12 @@
 import dateutil.parser
+import glob
 import os
 import os.path
 import tempfile
 
 from .log import log as Log
 from .ceph import Ceph
-from .disk import get_fs_info, get_mapped, wait_dev
+from .disk import get_fs_info, get_mapped, get_next_nbd, wait_dev
 import sh
 
 
@@ -44,8 +45,46 @@ class Restore():
 		tmp_dir = tempfile.mkdtemp()
 		return tmp_dir
 
+	def __map_vmdk(self, path):
+		for vmdk in glob.glob(f'{path}/*/*-flat.vmdk'):
+			vmdk_file = vmdk.split('/')[-1]
+			vmdk_overlay = f'/tmp/{self.clone}-{vmdk_file}.qcow2'
+			Log.debug(f'qemu-img create {vmdk_overlay} over {vmdk}')
+			sh.Command('qemu-img')('create', '-f', 'qcow2', '-b', vmdk, vmdk_overlay)
+			next_nbd = get_next_nbd()
+			Log.debug(f'qemu-nbd {vmdk_overlay} as {next_nbd}')
+			sh.Command('qemu-nbd')('--connect', next_nbd, vmdk_overlay)
+			wait_dev(next_nbd)
+			try:
+				maps = sh.Command('kpartx')('-av', next_nbd)
+				for mapped in maps:
+					mapped = mapped.rstrip()
+					dev = mapped.split(' ')[2]
+					dev = f'/dev/mapper/{dev}'
+					self.mount_dev(dev)
+			except Exception:
+				pass
+
+	def __mount_vmfs(self, path, tmp_dir):
+		for cmd in ('vmfs-fuse', 'vmfs6-fuse'):
+			try:
+				Log.debug(f'{cmd} {path} {tmp_dir}')
+				sh.Command(cmd)(path, tmp_dir)
+				self.__map_vmdk(tmp_dir)
+				return
+			except Exception:
+				pass
+
 	def __mount_part(self, path, fstype):
 		if fstype is None or fstype == 'swap':
+			return
+
+		if fstype == 'LVM2_member':
+			# get_fs_info will see the activated LVs as children,
+			# so they will be processed next
+			# I'll just wait for this partition, to make sure
+			# sub-devices will be there when I get to them
+			wait_dev(path)
 			return
 
 		tmp_dir = self.get_tmpdir()
@@ -53,12 +92,15 @@ class Restore():
 		if fstype == 'xfs':
 			Log.debug(f'xfs_repair -L {path}')
 			sh.Command('xfs_repair')('-L', path)
-		Log.debug(f'mount {path} {tmp_dir}')
-		try:
-			sh.Command('mount')(path, tmp_dir)
-		except Exception as e:
-			Log.warning(e)
-			pass
+		if fstype == 'VMFS_volume_member':
+			self.__mount_vmfs(path, tmp_dir)
+		else:
+			Log.debug(f'mount {path} {tmp_dir}')
+			try:
+				sh.Command('mount')(path, tmp_dir)
+			except Exception as e:
+				Log.warning(e)
+				pass
 
 	def mount_dev(self, dev):
 		try:
@@ -88,6 +130,9 @@ class Restore():
 	def umount_tree(self, tree):
 		for child in tree.children:
 			self.umount_tree(child)
+			if tree.name.fstype == 'LVM2_member':
+				Log.debug(f'\t{tree.name.dev}: lvchange -an {child.name.dev}')
+				sh.Command('lvchange')('-an', child.name.dev)
 		if tree.name.mountpoint is not None:
 			Log.debug(f'\t{tree.name.dev}: umount {tree.name.mountpoint}')
 			sh.Command('umount')(tree.name.mountpoint)
@@ -97,6 +142,12 @@ class Restore():
 		if tree.name.mapped is True:
 			Log.debug(f'\t{tree.name.dev}: kpartx -dv {tree.name.dev}')
 			sh.Command('kpartx')('-dv', tree.name.dev)
+			if tree.name.qemu_nbd is not None:
+				Log.debug(f'\t{tree.name.dev}: qemu-nbd --disconnect {tree.name.dev}')
+				sh.Command('qemu-nbd')('--disconnect', tree.name.dev)
+				Log.debug(f'\t{tree.name.dev}: rm {tree.name.qemu_nbd}')
+				os.unlink(tree.name.qemu_nbd)
+				return
 
 		if tree.name.image is not None:
 			Log.debug(f'\t{tree.name.dev}: rbd unmap {tree.name.image}')
