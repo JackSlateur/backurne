@@ -70,27 +70,27 @@ We see that both snapshots were created almost at the same time.
 
 Now, we would like to inspect a snapshot's content.
 ```
-32% [jack:~/backurne]sudo ./backurne map '8eb4f698-afdc-45bb-9f6c-1833c42ae368;vm-136-disk-1;test-backurne' 'backup;hourly;48;2018-06-01T15:44:26.499066'
-  INFO:  Mapping 8eb4f698-afdc-45bb-9f6c-1833c42ae368;vm-136-disk-1;test-backurne@backup;hourly;48;2018-06-01T15:44:26.499066 ..
-  INFO:  Please find our files in /tmp/tmp9kdlf0qf
-32% [jack:~/backurne]ls /tmp/tmp9kdlf0qf
+32% [jack:~/backurne]sudo ./
+backurne map 28b868e3-c145-4ea7-8dff-e5ae3b8093af\;scsi0\;nsint5 backup\;daily\;30\;2019-12-30T06\:00\:04.802699 
+  INFO:  Mapping 28b868e3-c145-4ea7-8dff-e5ae3b8093af;scsi0;nsint5@backup;daily;30;2019-12-30T06:00:04.802699 ..
+  INFO:  rbd 28b868e3-c145-4ea7-8dff-e5ae3b8093af;scsi0;nsint5 / snap backup;daily;30;2019-12-30T06:00:04.802699
+  INFO:  └── /dev/nbd0 (fstype None, size 20G)
+  INFO:      └── /dev/nbd0p1 on /tmp/tmp09nri0sh (fstype xfs, size 20G)
+32% [jack:~/backurne]ls /tmp/tmp09nri0sh
 bin  boot  dev  dlm  etc  home  initrd.img  initrd.img.old  lib  lib32  lib64  media  mnt  opt  proc  root  run  sbin  shared  srv  sys  tmp  usr  var  vmlinuz  vmlinuz.old
 ```
 
-The `map` subcommand clone a specific snapshot, map it, maps the partitions (if any) and try to mount the filesystem.
+The `map` subcommand clone a specific snapshot, map it, maps the partitions (if any) and try to mount the filesystems.
 Some things to consider:
 - the subcommand must be run with CAP_SYS_ADMIN, it will handle block devices and mount filesystems.
-- if you have multiple partition, or if you are using device-mapper (LVM etc) or mdraid etc, it will map the device, but not mount them
 - the mounted filesystem (or mapped block devices) is a clone of the snapshot, not the snapshot itself. It is thus writable, and will be deleted later : you can remove files or do whatever you want here without impacting the backup.
 
 Wait, what is mounted here already ?
 ```
 32% [jack:~/backurne]sudo ./backurne list-mapped
-+-----------------------------------------------------------------------------+-----------------------------------------------+--------------------+
-|  rbd                                                                        |  snap                                         |  mount             |
-+-----------------------------------------------------------------------------+-----------------------------------------------+--------------------+
-|  8eb4f698-afdc-45bb-9f6c-1833c42ae368;vm-136-disk-1;test-backurne           |  backup;hourly;48;2018-06-01T15:44:26.499066  |  /tmp/tmp9kdlf0qf  |
-+-----------------------------------------------------------------------------+-----------------------------------------------+--------------------+
+  INFO:  rbd 28b868e3-c145-4ea7-8dff-e5ae3b8093af;scsi0;nsint5 / snap backup;daily;30;2019-12-30T06:00:04.802699
+  INFO:  └── /dev/nbd0 (fstype None, size 20G)
+  INFO:      └── /dev/nbd0p1 on /tmp/tmp09nri0sh (fstype xfs, size 20G)
 ```
 
 Once you have recovered your files, you should do some cleanups:

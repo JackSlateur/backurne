@@ -45,13 +45,41 @@ The files can then be explored via a webgui at http://localhost:5000/explore/tmp
 ```
 11% [jack@jack:~]curl -s "http://localhost:5000/mapped/" | python -mjson.tool
 [
-    {
+  {
+    "dev": "/dev/nbd0",
+    "fstype": null,
+    "mountpoint": null,
+    "image": "restore-1",
+    "parent_image": "8eb4f698-afdc-45bb-9f6c-1833c42ae368;vm-136-disk-1",
+    "parent_snap": "test-backurne/backup;hourly;48;2018-06-01T15:44:26.499066",
+    "mapped": null,
+    "size": null,
+    "children": [
+      {
         "dev": "/dev/nbd0",
-        "image": "restore-1",
-        "mountpoint": "/tmp/tmp4_6ipuaw",
-        "parent_image": "8eb4f698-afdc-45bb-9f6c-1833c42ae368;vm-136-disk-1;test-backurne",
-        "parent_snap": "backup;hourly;48;2018-06-01T15:44:26.499066"
-    }
+        "fstype": null,
+        "mountpoint": null,
+        "image": null,
+        "parent_image": null,
+        "parent_snap": null,
+        "mapped": null,
+        "size": "20G",
+        "children": [
+          {
+            "dev": "/dev/nbd0p1",
+            "fstype": "xfs",
+            "mountpoint": "/tmp/tmp4_6ipuaw",
+            "image": null,
+            "parent_image": null,
+            "parent_snap": null,
+            "mapped": null,
+            "size": "20G",
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
 ]
 ```
 

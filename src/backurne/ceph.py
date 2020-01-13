@@ -43,7 +43,7 @@ class Ceph():
 		else:
 			return snap
 
-	def __info(self, image):
+	def info(self, image):
 		return self.__fetch('info', image)
 
 	def ls(self):
@@ -59,13 +59,13 @@ class Ceph():
 		return snap
 
 	def protect(self, extsnap):
-		info = self.__info(extsnap)
+		info = self.info(extsnap)
 		if info['protected'] == 'true':
 			return
 		self('snap', 'protect', extsnap)
 
 	def unprotect(self, extsnap):
-		info = self.__info(extsnap)
+		info = self.info(extsnap)
 		if info['protected'] == 'false':
 			return
 		self('snap', 'unprotect', extsnap)
@@ -78,37 +78,10 @@ class Ceph():
 		self('clone', extsnap, f'{self.pool}/{clone}')
 		return clone
 
-	def get_mapped(self):
-		result = []
-		rbd_nbd = sh.Command('rbd-nbd')
-		for mapped in rbd_nbd('list-mapped'):
-			if mapped.startswith('pid') or mapped.startswith('id'):
-				continue
-			mapped = mapped.split(' ')
-			mapped = [i for i in mapped if i != '']
-
-			parent = self.__info(mapped[2])['parent']
-			dev = mapped[-2].replace('/dev/', '')
-			for mount in open('/proc/mounts').readlines():
-				mount = mount.rstrip('\n')
-				if not mount.startswith(f'/dev/mapper/{dev}') and not mount.startswith(f'/dev/{dev}'):
-					# We do not found a mountpoint, set it to None
-					# to avoid polluting the output
-					mount = None
-					continue
-				mount = mount.split(' ')[1]
-				break
-			result.append({
-				'parent_image': parent['image'],
-				'parent_snap': parent['snapshot'],
-				'image': mapped[2],
-				'mountpoint': mount,
-				'dev': mapped[-2],
-			})
-
-		return result
-
 	def map(self, image):
+		# lazy import to avoid circular imports
+		from .disk import get_rbd_mapped
+
 		if self.esc is True:
 			Log.error('BUG: cannot map via ssh')
 			exit(1)
@@ -120,9 +93,9 @@ class Ceph():
 
 		# Should be enough .. right ?
 		time.sleep(1)
-		for mapped in self.get_mapped():
-			if mapped['image'] == image:
-				return mapped['dev']
+		for mapped in get_rbd_mapped():
+			if mapped.image == image:
+				return mapped.dev
 
 	def unmap(self, dev):
 		if self.esc is True:
@@ -130,6 +103,9 @@ class Ceph():
 			exit(1)
 
 		sh.Command('rbd-nbd')('unmap', dev)
+
+		# Wait a bit to make sure the dev is effectively gone
+		time.sleep(1)
 
 	def rm(self, image):
 		Log.debug(f'Deleting image {image} ..')

@@ -5,6 +5,8 @@ from flask import Blueprint
 from flask_autoindex import AutoIndexBlueprint
 import json
 from .restore import Restore
+from .disk import prepare_tree_to_json, get_mapped
+
 
 app = Flask(__name__)
 
@@ -64,9 +66,11 @@ def unmap(rbd, snap):
 
 @app.route('/mapped/')
 def mapped():
-	restore = Restore()
-	data = restore.list_mapped()
-	return send_json(data)
+	data = get_mapped(extended=False)
+	result = []
+	for tree in data:
+		result.append(prepare_tree_to_json(tree))
+	return send_json(result)
 
 
 auto_bp = Blueprint('auto_bp', __name__)

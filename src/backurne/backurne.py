@@ -22,6 +22,7 @@ from .ceph import Ceph
 from .proxmox import Proxmox
 from .restore import Restore
 from .backup import Bck
+from .disk import print_mapped, prepare_tree_to_json, get_mapped
 from . import stats
 
 
@@ -216,7 +217,7 @@ class Backup:
 
 					try:
 						run_hook('post_disk', bck.vm['name'], bck.rbd)
-					except:
+					except Exception:
 						pass
 					if dest is not None:
 						todo.append({
@@ -760,19 +761,28 @@ def main():
 		else:
 			print(pt)
 	elif args.action == 'list-mapped':
-		restore = Restore(None, None)
-		data = restore.list_mapped()
-		pt = pretty.Pt(['rbd', 'snap', 'mount'])
-		for i in data:
-			pt.add_row([i['parent_image'], i['parent_snap'], i['mountpoint']])
-
+		data = get_mapped(extended=False)
 		if args.json is True:
-			print(json.dumps(data))
+			result = []
+			for tree in data:
+				result.append(prepare_tree_to_json(tree))
+			print(json.dumps(result))
 		else:
-			print(pt)
+			print_mapped(data)
 	elif args.action == 'map':
-		restore = Restore(args.rbd, args.snapshot)
-		restore.mount()
+		for i in get_mapped(extended=False):
+			if i.name.parent_image != args.rbd or i.name.parent_snap != args.snapshot:
+				continue
+			Log.info('Already mapped:')
+			print_mapped([i, ])
+			return
+
+		Restore(args.rbd, args.snapshot).mount()
+		for i in get_mapped(extended=False):
+			if i.name.parent_image != args.rbd or i.name.parent_snap != args.snapshot:
+				continue
+			print_mapped([i, ])
+			return
 	elif args.action == 'unmap':
 		restore = Restore(args.rbd, args.snapshot)
 		restore.umount()

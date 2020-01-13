@@ -28,7 +28,7 @@ Encryption and compression at rest are also seamlessly supported via Bluestore O
 Required packages
 ---
 
-Core: python (>=3.6), python3-dateutil, python3-termcolor, python3-prettytable, python3-requests, python3-proxmoxer (from https://github.com/swayf/proxmoxer) \
+Core: python (>=3.6), python3-dateutil, python3-termcolor, python3-prettytable, python3-requests, python3-proxmoxer, python3-anytree (from https://github.com/c0fec0de/anytree, .deb for buster attached for convenience) \
 For mapping (optional): kpartx, rbd-nbd (luminous or later)\
 For the REST API: python3-flask, python3-flask-autoindex\
 For bash autocompletion: jq

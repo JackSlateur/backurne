@@ -1,25 +1,22 @@
 import dateutil.parser
 import os
+import os.path
 import tempfile
-import time
 
 from .log import log as Log
 from .ceph import Ceph
+from .disk import get_fs_info, get_mapped, wait_dev
 import sh
 
 
 class Restore():
 	def __init__(self, rbd=None, snap=None):
 		self.ceph = Ceph(None).backup
-		self.tmp_dir = None
 		self.dev = None
 
 		self.rbd = rbd
 		self.snap = snap
 		self.extsnap = f'{self.rbd}@{self.snap}'
-
-	def list_mapped(self):
-		return self.ceph.get_mapped()
 
 	def ls(self):
 		result = list()
@@ -43,90 +40,78 @@ class Restore():
 				})
 		return result
 
-	def mount_rbd(self, kpartx):
-		part = self.dev
-		if kpartx is True:
-			maps = sh.Command('kpartx')('-av', self.dev)
-			for mapped in maps:
-				mapped = mapped.rstrip()
-				Log.info(mapped)
+	def get_tmpdir(self):
+		tmp_dir = tempfile.mkdtemp()
+		return tmp_dir
 
-			nbd = self.dev.split('/')[2]
+	def __mount_part(self, path, fstype):
+		if fstype is None or fstype == 'swap':
+			return
 
-			# len(..) == 2 -> only one partition is found
-			if len(maps.split('\n')) != 2:
-				Log.info('You can now:')
-				Log.info(f'\tmount /dev/mapper/{nbd}pX {self.tmp_dir}')
-				Log.info(f'\t# Inspect {self.tmp_dir} and look at your files')
-				return
-			part = f'/dev/mapper/{nbd}p1'
-
-		time.sleep(0.5)
+		tmp_dir = self.get_tmpdir()
+		Log.debug(f'mounting {path} as {fstype} into {tmp_dir}')
+		if fstype == 'xfs':
+			Log.debug(f'xfs_repair -L {path}')
+			sh.Command('xfs_repair')('-L', path)
+		Log.debug(f'mount {path} {tmp_dir}')
 		try:
-			sh.Command('mount')(part, self.tmp_dir)
-			Log.info(f'Please find our files in {self.tmp_dir}')
-			return self.tmp_dir
-		except Exception:
-			Log.warning(f'mount {part} {self.tmp_dir} failed')
+			sh.Command('mount')(path, tmp_dir)
+		except Exception as e:
+			Log.warning(e)
+			pass
+
+	def mount_dev(self, dev):
+		try:
+			wait_dev(dev)
+			info = get_fs_info(dev)[0]
+			self.__mount_part(dev, info['fstype'])
+			if 'children' not in info:
+				return
+			for child in info['children']:
+				self.mount_dev(child['name'])
+		except Exception as e:
+			Log.warning(e)
 
 	def mount(self):
 		Log.info(f'Mapping {self.extsnap} ..')
-		for i in self.ceph.get_mapped():
-			if i['parent_image'] != self.rbd or i['parent_snap'] != self.snap:
-				continue
-			Log.info(f'Already mapped on {i["dev"]}, and possibly mounted on {i["mountpoint"]}')
-			return i['mountpoint']
-
 		self.ceph.protect(self.extsnap)
-		clone = self.ceph.clone(self.extsnap)
-		self.dev = self.ceph.map(clone)
+		self.clone = self.ceph.clone(self.extsnap)
+		self.dev = self.ceph.map(self.clone)
 
 		if self.dev is None:
-			Log.error(f'Cannot map {clone} (cloned from {self.extsnap})')
+			Log.error(f'Cannot map {self.clone} (cloned from {self.extsnap})')
 			return
 
-		kpartx = False
-		for part in sh.Command('wipefs')('-p', self.dev):
-			if part.startswith('#'):
-				continue
-			part = part.rstrip()
-			part_type = part.split(',')[3]
-			if part_type in ('dos', 'gpt'):
-				kpartx = True
-				break
-			if part_type == 'xfs':
-				# Dirty hack
-				# We need to zero the xfs logs
-				# However, a full xfs_repair can be quite long
-				# As the zero log is really fast, 30sec should
-				# be enough
-				try:
-					sh.Command('timeout')('30', 'xfs_repair', '-L', self.dev)
-				except sh.ErrorReturnCode:
-					# If xfs_repair timed out, an
-					# Exception is thrown. Do not care.
-					pass
+		self.mount_dev(self.dev)
+		return
 
-		self.tmp_dir = tempfile.mkdtemp()
-		try:
-			return self.mount_rbd(kpartx)
-		except Exception:
-			pass
+	def umount_tree(self, tree):
+		for child in tree.children:
+			self.umount_tree(child)
+		if tree.name.mountpoint is not None:
+			Log.debug(f'\t{tree.name.dev}: umount {tree.name.mountpoint}')
+			sh.Command('umount')(tree.name.mountpoint)
+			Log.debug(f'\t{tree.name.dev}: rmdir {tree.name.mountpoint}')
+			os.rmdir(tree.name.mountpoint)
+			return
+		if tree.name.mapped is True:
+			Log.debug(f'\t{tree.name.dev}: kpartx -dv {tree.name.dev}')
+			sh.Command('kpartx')('-dv', tree.name.dev)
 
-	def umount(self):
+		if tree.name.image is not None:
+			Log.debug(f'\t{tree.name.dev}: rbd unmap {tree.name.image}')
+			self.ceph.unmap(tree.name.dev)
+			Log.debug(f'\t{tree.name.dev}: rbd rm {tree.name.image}')
+			self.ceph.rm(tree.name.image)
+			Log.debug(f'\t{tree.name.dev}: rbd unprotect --snap {tree.name.parent_snap} {tree.name.parent_image}')
+			self.ceph.unprotect(f'{tree.name.parent_image}@{tree.name.parent_snap}')
+			return
+		Log.debug(f'{tree.name.dev}: Nothing to do ?')
+
+	def umount(self, recursed=False):
 		Log.info(f'Unmapping {self.extsnap} ..')
-		for i in self.ceph.get_mapped():
-			if i['parent_image'] != self.rbd or i['parent_snap'] != self.snap:
+		for i in get_mapped():
+			part = i.name
+			if part.parent_image != self.rbd or part.parent_snap != self.snap:
 				continue
-			Log.info(f'{self.extsnap} currently mapped on {i["dev"]}')
-			if i['mountpoint'] is not None:
-				try:
-					sh.Command('umount')(i['mountpoint'])
-				except sh.ErrorReturnCode:
-					Log.warning(f'Cannot umount {i["mountpoint"]}, maybe someone is using it ?')
-					continue
-				os.rmdir(i['mountpoint'])
-			sh.Command('kpartx')('-dv', i['dev'])
-			self.ceph.unmap(i['dev'])
-			self.ceph.rm(i['image'])
-			self.ceph.unprotect(self.extsnap)
+			self.umount_tree(i)
