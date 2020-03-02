@@ -26,6 +26,9 @@ class Restore():
 				if i.startswith('restore-'):
 					continue
 				split = i.split(';')
+				if len(split) != 3:
+					Log.warn(f'Unknown image {i}')
+					continue
 				result.append({
 					'ident': split[2],
 					'disk': split[1],
