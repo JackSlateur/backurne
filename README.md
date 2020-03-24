@@ -93,10 +93,21 @@ Once a VMFS device is mounted, each vmdk found inside will be mapped and mounted
 LVM support
 ---
 
-he same device may be seen at many layer by the device-mapped code.\
+The same device may be seen at many layer by the device-mapped code.\
 To activate some LV, especially if the lives inside vmdk (see vmware support), you will need to tell LVM to allow such behavior.\
 By default, LVM refuses to activate LVs that shows up in multiple PVs.\
 To allow this, edit `/etc/lvm/lvm.conf`, and set `allow_changes_with_duplicate_pvs` to `1`.\
+
+
+"Bare-metal" restore
+---
+
+Restoring a complete image is out of `backurne`'s scope.\
+If you are using `proxmox`, you may first need to restore the configuration in `/etc/pve/`.\
+Any way, once you know the target rbd image name, you will have to :\
+ - find the desired backup image, using `backurne ls`
+ - find the desired backup snapshot, using `backurne ls <image>`
+ - export and import the image, using `rbd export <image> --snap <snap> - | ssh <ceph-host> rbd import - <dest-image>`
 
 
 Note
