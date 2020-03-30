@@ -68,6 +68,8 @@ def get_file_size(path):
 def add_part(part, parent, extended):
 	if part['fstype'] == 'LVM2_member':
 		node = Node(Part(dev=part['name'], mountpoint=part['mountpoint'], fstype=part['fstype'], size=part['size']), parent=parent)
+		if 'children' not in part:
+			return
 		for child in part['children']:
 			add_part(child, node, extended)
 	elif part['fstype'] != 'VMFS_volume_member':
