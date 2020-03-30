@@ -103,7 +103,7 @@ def get_partitions(dev, node, extended=True, mapped=None, qemu_nbd=None):
 			maj = part['maj:min'].split(':')[0]
 			# We know that the device is mapped
 			# We will ignore non-mapped devices, to avoid duplicates
-			if mapped is True and maj != '252':
+			if mapped is True and not maj.startswith('25'):
 				continue
 			get_partitions(part['name'], sub_node, extended, mapped, qemu_nbd)
 
