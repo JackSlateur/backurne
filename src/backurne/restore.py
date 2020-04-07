@@ -27,7 +27,7 @@ class Restore():
 					continue
 				split = i.split(';')
 				if len(split) != 3:
-					Log.warn(f'Unknown image {i}')
+					Log.warning(f'Unknown image: {i}')
 					continue
 				result.append({
 					'ident': split[2],
