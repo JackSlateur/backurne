@@ -1,8 +1,5 @@
 # Command line interface
 
-**Important note**: multiple instance of `backurne backup` **must** not be run simultaneously. The behavior is unexpected, and may lead to snapshot corruption. You should add a pgrep or something on your crontab to avoid that.
-
-
 First of all, we should create some backups. Here, we have two backup policy : a daily for 30 days, and a hourly for 48 hours, this is the defaut:
 ```
 35% [jack:~/backurne]./backurne backup
