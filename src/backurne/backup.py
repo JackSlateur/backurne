@@ -59,14 +59,14 @@ class Bck():
 		return self.ceph.get_last_snap(good)
 
 	def dl_snap(self, snap_name, dest, last_snap):
-		Log.debug(f'Exporting {self.source}')
+		Log.debug(f'Exporting {self.source} {snap_name}')
 		if not self.ceph.backup.exists(dest):
 			# Create a dummy image, on our backup cluster,
 			# which will receive a full snapshot
 			self.ceph.backup('create', dest, '-s', '1')
 
 		self.ceph.do_backup(self.rbd, snap_name, dest, last_snap)
-		Log.debug(f'Export {self.source} complete')
+		Log.debug(f'Export {self.source} {snap_name} complete')
 
 	def check_profile(self, profile):
 		try:
