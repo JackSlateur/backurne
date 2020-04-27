@@ -37,6 +37,13 @@ Let's run the command again:
 Nothing to do !\
 You can run this command many time, as it will avoid doing backups if the previous one is not old enough.
 
+By default, everything is processed. You can filter things using the following backup options:
+  - `--cluster`
+  - `--vmid`
+  - `--profile`
+
+Also, you can force the processing of a backup, even if the previous one is not old enough, using the `--force` option.
+
 
 Now, we should list our backuped disks:
 ```

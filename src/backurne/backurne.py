@@ -152,10 +152,11 @@ def run_hook(kind, vmname, diskname):
 
 
 class Backup:
-	def __init__(self, cluster, queue, status_queue):
+	def __init__(self, cluster, queue, status_queue, args=None):
 		self.cluster = cluster
 		self.queue = queue
 		self.status_queue = status_queue
+		self.args = args
 
 	def is_expired(snap, last=False):
 		splited = snap.split(';')
@@ -188,7 +189,7 @@ class Backup:
 			with Lock(bck.dest):
 				for profile, value in profiles:
 					self.status_queue.put('add_item')
-					if not bck.check_profile(profile):
+					if not self.args.force and not bck.check_profile(profile):
 						self.status_queue.put('done_item')
 						continue
 
@@ -339,8 +340,8 @@ class Backup:
 
 
 class BackupProxmox(Backup):
-	def __init__(self, cluster, queue, status_queue):
-		super().__init__(cluster, queue, status_queue)
+	def __init__(self, cluster, queue, status_queue, args):
+		super().__init__(cluster, queue, status_queue, args)
 
 	def __fetch_profiles(self, vm, disk):
 		profiles = list(config['profiles'].items())
@@ -391,9 +392,26 @@ class BackupProxmox(Backup):
 			Log.error(f'{e} thrown while listing vm on {self.cluster["name"]}')
 		return result
 
+	def filter_profiles(self, profiles, _filter):
+		if _filter is None:
+			return profiles
+
+		result = list()
+		for profile in profiles:
+			if profile[0] == _filter:
+				result.append(profile)
+			else:
+				Log.debug(f'Skipping profile {profile[0]}, due to --profile')
+		return result
+
 	@handle_exc
 	def create_snap(self, vm):
 		setproctitle.setproctitle('Backurne idle producer')
+
+		if self.args.vmid is not None:
+			if vm['vmid'] != self.args.vmid:
+				Log.debug(f'Skipping VM {vm["vmid"]}, due to --vmid')
+				return
 
 		px = Proxmox(self.cluster)
 		# We freeze the VM once, thus create all snaps at the same time
@@ -405,6 +423,7 @@ class BackupProxmox(Backup):
 
 		for disk, ceph, bck in vm['to_backup']:
 			profiles = self.__fetch_profiles(vm, disk)
+			profiles = self.filter_profiles(profiles, self.args.profile)
 			hooked = self._create_snap(bck, profiles, pre_vm_hook)
 			if hooked is None:
 				# pre_vm hook failed, we skip all its disks
@@ -421,6 +440,11 @@ class BackupProxmox(Backup):
 	@handle_exc
 	def expire_item(self, vm):
 		for disk, ceph, bck in vm['to_backup']:
+			if self.args.vmid is not None:
+				if vm['vmid'] != self.args.vmid:
+					Log.debug(f'Skipping VM {vm["vmid"]}, due to --vmid')
+					return
+
 			with Lock(bck.dest):
 				self._expire_item(ceph, disk, vm)
 
@@ -530,9 +554,10 @@ class Lock:
 
 
 class Producer:
-	def __init__(self, queue, status_queue):
+	def __init__(self, queue, status_queue, args):
 		self.queue = queue
 		self.status_queue = status_queue
+		self.args = args
 
 	@handle_exc
 	def __call__(self):
@@ -551,9 +576,13 @@ class Producer:
 
 	def __work__(self):
 		for cluster in config['live_clusters']:
+			if self.args.cluster is not None:
+				if cluster['name'] != self.args.cluster:
+					Log.debug(f'Skipping cluster {cluster["name"]} due to --cluster')
+					continue
 			Log.debug(f'Backuping {cluster["type"]}: {cluster["name"]}')
 			if cluster['type'] == 'proxmox':
-				bidule = BackupProxmox(cluster, self.queue, self.status_queue)
+				bidule = BackupProxmox(cluster, self.queue, self.status_queue, self.args)
 			else:
 				bidule = BackupPlain(cluster, self.queue, self.status_queue)
 			bidule.create_snaps()
@@ -646,7 +675,12 @@ def update_check_results(check_results):
 def get_args():
 	parser = argparse.ArgumentParser()
 	sub = parser.add_subparsers(dest='action', required=True)
-	sub.add_parser('backup')
+	back = sub.add_parser('backup')
+	back.add_argument('--cluster', dest='cluster', nargs='?')
+	back.add_argument('--vmid', dest='vmid', nargs='?', type=int)
+	back.add_argument('--profile', dest='profile', nargs='?')
+	back.add_argument('--force', action='store_true')
+
 	sub.add_parser('precheck')
 	sub.add_parser('check')
 	sub.add_parser('check-snap')
@@ -696,12 +730,16 @@ def main():
 		update_check_results(result)
 		print_check_results()
 	elif args.action == 'backup':
+		if args.vmid is not None and args.cluster is None:
+			Log.error(f'--vmid has no meaning without --cluster')
+			exit(1)
+
 		manager = multiprocessing.Manager()
 		atexit.register(manager.shutdown)
 		queue = manager.Queue()
 
 		with Status_updater(manager, 'images processed') as status_queue:
-			producer = multiprocessing.Process(target=Producer(queue, status_queue))
+			producer = multiprocessing.Process(target=Producer(queue, status_queue, args))
 			atexit.register(producer.terminate)
 			producer.start()
 
@@ -719,25 +757,31 @@ def main():
 
 		with Status_updater(manager, 'images cleaned up on live clusters') as status_queue:
 			for cluster in config['live_clusters']:
+				if args.cluster is not None:
+					if cluster['name'] != args.cluster:
+						Log.debug(f'Skipping cluster {cluster["name"]} due to --cluster')
+						continue
+
 				Log.debug(f'Expire snapshots from live {cluster["type"]}: {cluster["name"]}')
 				if cluster['type'] == 'proxmox':
-					bidule = BackupProxmox(cluster, None, status_queue)
+					bidule = BackupProxmox(cluster, None, status_queue, args)
 				else:
 					bidule = BackupPlain(cluster, None, status_queue)
 				bidule.expire_live()
 
-		Log.debug('Expiring our snapshots')
-		# Dummy Ceph object used to retrieve the real backup Object
-		ceph = Ceph(None)
+		if args.cluster is None and args.profile is None and args.vmid is None:
+			Log.debug('Expiring our snapshots')
+			# Dummy Ceph object used to retrieve the real backup Object
+			ceph = Ceph(None)
 
-		with Status_updater(manager, 'images cleaned up on backup cluster') as status_queue:
-			data = list()
-			for i in ceph.backup.ls():
-				data.append({'ceph': ceph, 'image': i, 'status_queue': status_queue})
-				status_queue.put('add_item')
-			with multiprocessing.Pool(config['backup_worker']) as pool:
-				for i in pool.imap_unordered(Backup.expire_backup, data):
-					pass
+			with Status_updater(manager, 'images cleaned up on backup cluster') as status_queue:
+				data = list()
+				for i in ceph.backup.ls():
+					data.append({'ceph': ceph, 'image': i, 'status_queue': status_queue})
+					status_queue.put('add_item')
+				with multiprocessing.Pool(config['backup_worker']) as pool:
+					for i in pool.imap_unordered(Backup.expire_backup, data):
+						pass
 
 		manager.shutdown()
 	elif args.action == 'ls':
