@@ -266,7 +266,7 @@ class Backup:
 			# The last shared snapshot must be kept
 			# Also, subsequent snaps shall be kept as well,
 			# because a backup may be pending elsewhere
-			if snap >= shared:
+			if shared is None or snap >= shared:
 				continue
 			tmp = snap.split(';')
 			if tmp[1] not in by_profile:
