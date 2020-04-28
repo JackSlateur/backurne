@@ -450,8 +450,8 @@ class BackupProxmox(Backup):
 
 
 class BackupPlain(Backup):
-	def __init__(self, cluster, queue, status_queue):
-		super().__init__(cluster, queue, status_queue)
+	def __init__(self, cluster, queue, status_queue, args):
+		super().__init__(cluster, queue, status_queue, args)
 		self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'])
 
 	def list(self):
@@ -584,7 +584,7 @@ class Producer:
 			if cluster['type'] == 'proxmox':
 				bidule = BackupProxmox(cluster, self.queue, self.status_queue, self.args)
 			else:
-				bidule = BackupPlain(cluster, self.queue, self.status_queue)
+				bidule = BackupPlain(cluster, self.queue, self.status_queue, self.args)
 			bidule.create_snaps()
 
 
@@ -766,7 +766,7 @@ def main():
 				if cluster['type'] == 'proxmox':
 					bidule = BackupProxmox(cluster, None, status_queue, args)
 				else:
-					bidule = BackupPlain(cluster, None, status_queue)
+					bidule = BackupPlain(cluster, None, status_queue, args)
 				bidule.expire_live()
 
 		if args.cluster is None and args.profile is None and args.vmid is None:
