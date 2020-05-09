@@ -4,6 +4,7 @@ import json
 import time
 from .config import config
 from .log import log as Log
+from .log import report_time
 from subprocess import Popen, PIPE, DEVNULL
 import sh
 
@@ -159,12 +160,15 @@ class Ceph():
 		else:
 			imp = f'{self.backup.cmd} import-diff --no-progress - "{dest}"'
 
+		start = datetime.datetime.now()
 		p1 = Popen(export, stdout=PIPE)
 
 		p2 = Popen(imp, stdin=p1.stdout, shell=True)
 
 		p1.stdout.close()
 		p2.communicate()
+		end = datetime.datetime.now()
+		report_time(image, self.endpoint, end - start)
 
 	def get_last_snap(self, snaps):
 		last_date = datetime.datetime.fromtimestamp(0)

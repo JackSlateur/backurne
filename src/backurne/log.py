@@ -1,6 +1,7 @@
 import logging
 import logging.handlers
 import sys
+import syslog
 from termcolor import colored
 from .config import config
 
@@ -26,13 +27,24 @@ class ConsoleFormatter(logging.Formatter):
 
 		return logging.Formatter.format(self, record)
 
+def report_time(image, endpoint, duration):
+	if config['report_time'] is None:
+		return
+
+	msg = f'Image {image} from {endpoint} backed up, elasped time: {duration}'
+	if config['report_time'] == 'syslog':
+		syslog.syslog(syslog.LOG_INFO, msg)
+	else:
+		with open('/tmp/log', 'a') as f:
+			f.write(f'{msg}\n')
+
 
 log = logging.getLogger('backurne')
 
-syslog = logging.handlers.SysLogHandler(address='/dev/log')
+slog = logging.handlers.SysLogHandler(address='/dev/log')
 detailed_formatter = logging.Formatter('%(name)s[%(process)d]: %(levelname)s: [%(filename)s:%(lineno)s:%(funcName)s()] %(message)s')
-syslog.setFormatter(detailed_formatter)
-log.addHandler(syslog)
+slog.setFormatter(detailed_formatter)
+log.addHandler(slog)
 
 if sys.stdout.isatty():
 	console = logging.StreamHandler()

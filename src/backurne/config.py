@@ -42,6 +42,7 @@ def load_config():
 			'post_disk': None,
 			'post_vm': None,
 		},
+		'report_time': 'syslog',
 	}
 
 	custom = imp.new_module('custom')
