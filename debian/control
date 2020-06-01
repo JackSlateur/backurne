@@ -12,7 +12,7 @@ Homepage: https://github.com/JackSlateur/backurne
 
 Package: backurne
 Architecture: any
-Depends: python3 (>= 3.6),
+Depends: python3 (>= 3.7),
          python3-termcolor,
          python3-pkg-resources,
          python3-ptable | python3-prettytable,
