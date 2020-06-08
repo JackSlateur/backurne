@@ -680,6 +680,7 @@ def get_args():
 	back.add_argument('--vmid', dest='vmid', nargs='?', type=int)
 	back.add_argument('--profile', dest='profile', nargs='?')
 	back.add_argument('--force', action='store_true')
+	back.add_argument('--no-cleanup', action='store_true')
 
 	sub.add_parser('precheck')
 	sub.add_parser('check')
@@ -754,6 +755,10 @@ def main():
 			# When all of them are done, we are done
 			for pid in live_workers:
 				pid.join()
+
+		if args.no_cleanup is True:
+			Log.debug('not cleaning up as --no-cleanup is used')
+			exit(0)
 
 		with Status_updater(manager, 'images cleaned up on live clusters') as status_queue:
 			for cluster in config['live_clusters']:
