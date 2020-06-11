@@ -59,12 +59,12 @@ class Check:
 		rbd = args['image']
 
 		if not ceph.backup.exists(backup.dest):
-			msg = f'No backup found for {rbd} (image does not exists)'
+			msg = f'No backup found for {backup} at {ceph} (image does not exists)'
 			return {'image': rbd, 'msg': msg}
 
 		last = ceph.get_last_shared_snap(rbd, backup.dest)
 		if last is None:
-			msg = f'No backup found for {rbd} (no shared snap)'
+			msg = f'No backup found for {backup} at {ceph} (no shared snap)'
 			return {'image': rbd, 'msg': msg}
 
 		when = last.split(';')[3]
@@ -72,7 +72,7 @@ class Check:
 		deadline = datetime.timedelta(days=1) + datetime.timedelta(hours=6)
 		deadline = datetime.datetime.now() - deadline
 		if when < deadline:
-			msg = f'Backup found for {rbd}, yet too old (created at {when})'
+			msg = f'Backup found for {backup} at {ceph}, yet too old (created at {when})'
 			return {'image': rbd, 'msg': msg}
 
 	def cmp_snap(self, backup, ceph, rbd):
