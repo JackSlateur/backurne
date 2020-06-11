@@ -636,7 +636,7 @@ def print_check_results():
 	if len(failed) > 0:
 		print(f'Error: {len(failed)} failed backups found')
 		for err in failed:
-			print(err[3])
+			print(f'{err[1]} : {err[3]}')
 		exit(2)
 
 	print('OK: all things are backed up!')
