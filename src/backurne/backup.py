@@ -77,8 +77,10 @@ class Bck():
 
 		if profile == 'daily':
 			delta = datetime.timedelta(days=1)
-		else:
+		elif profile == 'hourly':
 			delta = datetime.timedelta(hours=1)
+		else:  # weekly
+			delta = datetime.timedelta(days=7)
 		not_after = datetime.datetime.now() - delta
 		if last_profile is not None:
 			last_time = last_profile.split(';')[3]
