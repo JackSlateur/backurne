@@ -1,3 +1,10 @@
+backurne (2.1.0) UNRELEASED; urgency=medium
+
+  * Backuping only a subset for a `backurne backup` invocation is now possible, as well as forcing a backup (despite being considered unneeded regarding the profile).
+  * **Backurne** now reports time elapsed to process each backup, either to a plain file or via syslog. See the `report_time` configuration entry.
+
+ -- Alexandre Bruyelles <backurne@jack.fr.eu.org>  Sat, 04 Jul 2020 13:50:19 +0100
+
 backurne (2.0.0) UNRELEASED; urgency=medium
 
   * The `list-mapped` subcommand has been reworked to support complex mapping. Command outputs (both cli & api) has been altered to support those changes.
@@ -5,7 +12,6 @@ backurne (2.0.0) UNRELEASED; urgency=medium
   * **Backurne** now supports vmware. Also see README.md.
 
  -- Alexandre Bruyelles <backurne@jack.fr.eu.org>  Mon, 13 Jan 2020 13:40:19 +0100
-
 
 backurne (1.1.0) UNRELEASED; urgency=medium
 

@@ -1,9 +1,15 @@
+Version 2.1.0
+
+**Notable changes** :
+ * Backuping only a subset for a `backurne backup` invocation is now possible, as well as forcing a backup (despite being considered unneeded regarding the profile). See [cli.md](cli.md).
+ * **Backurne** now reports time elapsed to process each backup, either to a plain file or via syslog. See the `report_time` configuration entry.
+
 Version 2.0.0
 
 **Notable changes** :
  * The `list-mapped` subcommand has been reworked to support complex mapping. Command outputs (both cli & api) has been altered to support those changes.
- * **Backurne** now supports LVM. See README.md for its specific configuration.
- * **Backurne** now supports vmware. Also see README.md.
+ * **Backurne** now supports LVM. See [README.md](README.md) for its specific configuration.
+ * **Backurne** now supports vmware. Also see [README.md](README.md).
 
 Version 1.1.0
 
