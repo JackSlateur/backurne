@@ -242,6 +242,9 @@ class Backup:
 			for i in pool.imap_unordered(self.create_snap, items):
 				pass
 
+	def _custom_key(self, item):
+		return item.split(';')[3]
+
 	def _expire_item(self, ceph, disk, vm=None):
 		self.status_queue.put('add_item')
 		self.status_queue.put('done_item')
@@ -259,7 +262,8 @@ class Backup:
 		shared = list(set(backups).intersection(snaps))
 
 		try:
-			shared = sorted(shared).pop()
+			shared.sort(key=self._custom_key)
+			shared = shared.pop()
 		except IndexError:
 			shared = None
 
@@ -268,7 +272,7 @@ class Backup:
 			# The last shared snapshot must be kept
 			# Also, subsequent snaps shall be kept as well,
 			# because a backup may be pending elsewhere
-			if shared is None or snap >= shared:
+			if shared is None or snap.split(';')[3] >= shared.split(';')[3]:
 				continue
 			tmp = snap.split(';')
 			if tmp[1] not in by_profile:
