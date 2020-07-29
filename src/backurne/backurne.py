@@ -687,6 +687,7 @@ def get_args():
 	back.add_argument('--profile', dest='profile', nargs='?')
 	back.add_argument('--force', action='store_true')
 	back.add_argument('--no-cleanup', action='store_true')
+	back.add_argument('--cleanup', action='store_true')
 
 	sub.add_parser('precheck')
 	sub.add_parser('check')
@@ -780,7 +781,7 @@ def main():
 					bidule = BackupPlain(cluster, None, status_queue, args)
 				bidule.expire_live()
 
-		if args.cluster is None and args.profile is None and args.vmid is None:
+		if args.cleanup or args.cluster is None and args.profile is None and args.vmid is None:
 			Log.debug('Expiring our snapshots')
 			# Dummy Ceph object used to retrieve the real backup Object
 			ceph = Ceph(None)
