@@ -9,6 +9,7 @@ backurne \- backup Ceph's RBD on Ceph, with Proxmox integration
 .I [--profile <profile>]
 .I [--force]
 .I [--no-cleanup]
+.I [--cleanup]
 .br
 .B backurne
 .RI precheck
@@ -48,7 +49,30 @@ backurne is a handy tool for backuping RBD's image on RBD.
 .IP "\fBbackup\fR" 4
 backup
 .IP
-Create backups. Backurne connects to every cluster defined on its configuration and process the required backup.
+Create backups.
+.br
+By default,
+.B Backurne
+connects to every cluster defined on its configuration, processes the required backups and scan every existing backups for potential cleanup.
+.br
+You can process only a subset of images using a combinaison of
+.I --cluster, --vmid
+and
+.I --profile.
+.br
+Please note that
+.I --vmid
+cannot be used without
+.I --cluster,
+because those ID are not globally unique.
+.br
+Also, when you process only such subset, cleaning up existing backups is not done. You may use the
+.I --cleanup
+option to change that behavior.
+.br
+Similarly, if you do not want to cleanup with a simple invocation, you can use the
+.I --no-cleanup
+option.
 .IP "\fBprecheck\fR" 4
 precheck
 .IP

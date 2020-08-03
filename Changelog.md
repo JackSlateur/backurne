@@ -1,3 +1,8 @@
+PENDING
+
+**Notable changes** :
+ * add a --cleanup option to the `backup` subcommand.
+
 Version 2.1.0
 
 **Notable changes** :
