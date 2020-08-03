@@ -57,6 +57,25 @@ _backurne(){
 		fi
 		return 0
 	fi
+
+	if [ "$subcmd" == "backup" ]
+	then
+		if [ "$prev" == "--cluster" ]
+		then
+			opts=$(python3 - <<EOF
+import backurne.config
+clusters = backurne.config.config['live_clusters']
+for i in clusters:
+        print(i['name'])
+EOF
+)
+			COMPREPLY=($(compgen -W "$opts" -- ${cur}))
+		else
+			opts="--cluster --vmid --profile --force --no-cleanup --cleanup"
+			COMPREPLY=($(compgen -W "$opts" -- ${cur}))
+		fi
+		return 0
+	fi
 }
 
 command -v jq && complete -o filenames -F _backurne backurne
