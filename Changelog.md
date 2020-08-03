@@ -2,6 +2,7 @@ PENDING
 
 **Notable changes** :
  * add a --cleanup option to the `backup` subcommand.
+ * fix vmfs6 support
 
 Version 2.1.0
 

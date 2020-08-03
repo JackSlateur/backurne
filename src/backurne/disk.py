@@ -30,7 +30,7 @@ def resolv_vmfs(dev):
 		i = i.info['cmdline']
 		if len(i) == 0:
 			continue
-		if 'vmfs-fuse' not in i[0]:
+		if 'vmfs-fuse' not in i[0] and 'vmfs6-fuse' not in i[0]:
 			continue
 		if i[1] != dev:
 			continue
