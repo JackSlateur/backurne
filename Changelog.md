@@ -3,6 +3,7 @@ PENDING
 **Notable changes** :
  * add a --cleanup option to the `backup` subcommand.
  * fix vmfs6 support
+ * add a --debug option for one-shot verbosity
 
 Version 2.1.0
 

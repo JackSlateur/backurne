@@ -680,6 +680,8 @@ def update_check_results(check_results):
 
 def get_args():
 	parser = argparse.ArgumentParser()
+	parser.add_argument('--debug', action='store_true')
+
 	sub = parser.add_subparsers(dest='action', required=True)
 	back = sub.add_parser('backup')
 	back.add_argument('--cluster', dest='cluster', nargs='?')
@@ -714,6 +716,11 @@ def get_args():
 
 def main():
 	args = get_args()
+
+	if args.debug:
+		import logging
+		Log.setLevel(logging.DEBUG)
+
 	if args.action == 'stats':
 		stats.print_stats()
 	elif args.action == 'version':
