@@ -29,6 +29,7 @@ backurne \- backup Ceph's RBD on Ceph, with Proxmox integration
 .RI map
 .I rbd
 .I snapshot
+.I [vmdk]
 .br
 .B backurne
 .RI unmap
@@ -105,6 +106,7 @@ argument lets it produce machine readable json.
 map
 .I rbd
 .I snapshot
+.I [vmdk]
 .IP
 Map a snapshot. A mapped snapshot allows the user to explore and restore part of a snapshot. Volatile modifications are seamlessly allowed (the backup is never modified).
 .br
@@ -119,6 +121,12 @@ will try to mount that filesystem using
 If
 .B backurne
 did not manage to mount a filesystem, a message is printed and the user is left with manual handling. As printed, the backup shall be present at /dev/nbdX, and partitions (if any) at /dev/mapper/nbdXpY.
+.br
+By default, vmdk files are not mapped. The vmfs block device will be mounted, but vmdk will only be listed.
+.br
+You can use the optional
+.I vmdk
+parameter to also map a vmdk.
 .IP "\fBunmap\fR" 4
 unmap
 .I rbd

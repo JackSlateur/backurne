@@ -707,6 +707,7 @@ def get_args():
 	_map = sub.add_parser('map')
 	_map.add_argument(dest='rbd')
 	_map.add_argument(dest='snapshot')
+	_map.add_argument(dest='vmdk', nargs='?')
 
 	unmap = sub.add_parser('unmap')
 	unmap.add_argument(dest='rbd')
@@ -833,19 +834,13 @@ def main():
 		else:
 			print_mapped(data)
 	elif args.action == 'map':
-		for i in get_mapped(extended=False):
+		Restore(args.rbd, args.snapshot, args.vmdk).mount()
+		for i in get_mapped(extended=False, ro=False):
 			if i.name.parent_image != args.rbd or i.name.parent_snap != args.snapshot:
 				continue
-			Log.info('Already mapped:')
 			print_mapped([i, ])
 			return
 
-		Restore(args.rbd, args.snapshot).mount()
-		for i in get_mapped(extended=False):
-			if i.name.parent_image != args.rbd or i.name.parent_snap != args.snapshot:
-				continue
-			print_mapped([i, ])
-			return
 	elif args.action == 'unmap':
 		restore = Restore(args.rbd, args.snapshot)
 		restore.umount()

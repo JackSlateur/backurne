@@ -2,8 +2,9 @@ PENDING
 
 **Notable changes** :
  * add a --cleanup option to the `backup` subcommand.
- * fix vmfs6 support
- * add a --debug option for one-shot verbosity
+ * fix vmfs6 support.
+ * add a --debug option for one-shot verbosity.
+ * rework the `map` subcommand with enhancement to the vmdk support (especially in conjunction with lvm).
 
 Version 2.1.0
 
