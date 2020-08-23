@@ -835,7 +835,7 @@ def main():
 			print_mapped(data)
 	elif args.action == 'map':
 		Restore(args.rbd, args.snapshot, args.vmdk).mount()
-		for i in get_mapped(extended=False, ro=False):
+		for i in get_mapped(extended=False):
 			if i.name.parent_image != args.rbd or i.name.parent_snap != args.snapshot:
 				continue
 			print_mapped([i, ])
