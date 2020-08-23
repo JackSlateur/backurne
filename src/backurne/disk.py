@@ -124,7 +124,7 @@ def add_part(part, parent, extended, qemu_nbd=None):
 
 
 def filter_children(children, mapped):
-	if mapped is False:
+	if mapped is False or mapped is None:
 		return children
 
 	# We know that the device is mapped
@@ -132,7 +132,7 @@ def filter_children(children, mapped):
 	result = []
 	for child in children:
 		maj = child['maj:min'].split(':')[0]
-		if maj.startswith('25'):
+		if maj.startswith('25') or child['fstype'] == 'VMFS_volume_member':
 			result.append(child)
 	return result
 
