@@ -84,7 +84,7 @@ backurne map 28b868e3-c145-4ea7-8dff-e5ae3b8093af\;scsi0\;nsint5 backup\;daily\;
 bin  boot  dev  dlm  etc  home  initrd.img  initrd.img.old  lib  lib32  lib64  media  mnt  opt  proc  root  run  sbin  shared  srv  sys  tmp  usr  var  vmlinuz  vmlinuz.old
 ```
 
-The `map` subcommand clone a specific snapshot, map it, maps the partitions (if any) and try to mount the filesystems.
+The `map` subcommand clones a specific snapshot, maps it, maps the partitions (if any) and tries to mount the filesystems.
 Some things to consider:
 - the subcommand must be run with CAP_SYS_ADMIN, it will handle block devices and mount filesystems.
 - the mounted filesystem (or mapped block devices) is a clone of the snapshot, not the snapshot itself. It is thus writable, and will be deleted later : you can remove files or do whatever you want here without impacting the backup.
