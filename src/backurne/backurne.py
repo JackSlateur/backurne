@@ -256,7 +256,7 @@ class Backup:
 			bck = Bck(self.cluster['name'], ceph, disk)
 			rbd = disk
 
-		backups = Ceph(None, is_backup=True).snap(bck.dest)
+		backups = Ceph(None).snap(bck.dest)
 
 		snaps = ceph.snap(rbd)
 		shared = list(set(backups).intersection(snaps))
@@ -792,7 +792,7 @@ def main():
 		if args.cleanup or args.cluster is None and args.profile is None and args.vmid is None:
 			Log.debug('Expiring our snapshots')
 			# Dummy Ceph object used to retrieve the real backup Object
-			ceph = Ceph(None, is_backup=True)
+			ceph = Ceph(None)
 
 			with Status_updater(manager, 'images cleaned up on backup cluster') as status_queue:
 				data = list()

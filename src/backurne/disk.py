@@ -199,7 +199,7 @@ def get_rbd_mapped():
 	result = []
 	mapped = rbd('--format', 'json', '-t', 'nbd', 'device', 'list')
 	for mapped in json.loads(mapped.stdout):
-		info = Ceph(None).backup.info(mapped['image'])['parent']
+		info = Ceph(None).info(mapped['image'])['parent']
 		part = Part(dev=mapped['device'], image=mapped['image'], parent_image=info['image'], parent_snap=info['snapshot'])
 		result.append(part)
 	return result

@@ -12,7 +12,7 @@ import sh
 
 class Restore():
 	def __init__(self, rbd=None, snap=None, vmdk=None):
-		self.ceph = Ceph(None).backup
+		self.ceph = Ceph(None)
 		self.dev = None
 
 		self.rbd = rbd

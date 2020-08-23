@@ -10,22 +10,20 @@ import sh
 
 
 class Ceph():
-	def __init__(self, pool, is_backup=False, endpoint=None):
-		self.pool = pool
-		if is_backup:
+	def __init__(self, pool, endpoint=None):
+		self.endpoint = endpoint
+		if pool is None:
 			pool = config['backup_cluster']['pool']
 			self.pool = pool
 			self.cmd = sh.Command('rbd').bake('-p', pool)
 			self.esc = False
 		else:
+			self.backup = Ceph(None)
 			self.cmd = sh.Command('ssh').bake('-n', endpoint, 'rbd', '-p', pool)
 			self.esc = True
 
 		self.json = self.cmd.bake('--format', 'json')
-		self.endpoint = endpoint
-
-		if not is_backup:
-			self.backup = Ceph(None, is_backup=True)
+		self.pool = pool
 
 	def __str__(self):
 		return 'pool: %s, endpoint: %s' % (self.pool, self.endpoint)

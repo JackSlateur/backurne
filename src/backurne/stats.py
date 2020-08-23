@@ -6,7 +6,7 @@ from .ceph import Ceph
 
 
 def print_stats():
-	ceph = Ceph(None).backup
+	ceph = Ceph(None)
 
 	result = {}
 
