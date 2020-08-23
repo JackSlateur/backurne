@@ -256,7 +256,7 @@ class Backup:
 			bck = Bck(self.cluster['name'], ceph, disk)
 			rbd = disk
 
-		backups = Ceph(None).backup.snap(bck.dest)
+		backups = Ceph(None, is_backup=True).snap(bck.dest)
 
 		snaps = ceph.snap(rbd)
 		shared = list(set(backups).intersection(snaps))
@@ -318,7 +318,7 @@ class Backup:
 		i['status_queue'].put('done_item')
 
 		with Lock(image):
-			snaps = ceph.backup.snap(image)
+			snaps = ceph.snap(image)
 			try:
 				# Pop the last snapshot
 				# We will take care of it later
@@ -327,22 +327,22 @@ class Backup:
 				# We found an image without snapshot
 				# Someone is messing around, or this is a bug
 				# Anyway, the image can be deleted
-				ceph.backup.rm(image)
+				ceph.rm(image)
 				return
 
 			for snap in snaps:
 				if not Backup.is_expired(snap):
 					continue
-				ceph.backup.rm_snap(image, snap)
+				ceph.rm_snap(image, snap)
 
-			snaps = ceph.backup.snap(image)
+			snaps = ceph.snap(image)
 			if len(snaps) == 1:
 				if Backup.is_expired(last, last=True):
-					ceph.backup.rm_snap(image, snaps[0])
+					ceph.rm_snap(image, snaps[0])
 
-			if len(ceph.backup.snap(image)) == 0:
+			if len(ceph.snap(image)) == 0:
 				Log.debug(f'{image} has no snapshot left, deleting')
-				ceph.backup.rm(image)
+				ceph.rm(image)
 
 
 class BackupProxmox(Backup):
@@ -792,11 +792,11 @@ def main():
 		if args.cleanup or args.cluster is None and args.profile is None and args.vmid is None:
 			Log.debug('Expiring our snapshots')
 			# Dummy Ceph object used to retrieve the real backup Object
-			ceph = Ceph(None)
+			ceph = Ceph(None, is_backup=True)
 
 			with Status_updater(manager, 'images cleaned up on backup cluster') as status_queue:
 				data = list()
-				for i in ceph.backup.ls():
+				for i in ceph.ls():
 					data.append({'ceph': ceph, 'image': i, 'status_queue': status_queue})
 					status_queue.put('add_item')
 				with multiprocessing.Pool(config['backup_worker']) as pool:
