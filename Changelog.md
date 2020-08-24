@@ -1,6 +1,10 @@
 PENDING
 
 **Notable changes** :
+
+Version 2.2.0
+
+**Notable changes** :
  * add a --cleanup option to the `backup` subcommand.
  * fix vmfs6 support.
  * add a --debug option for one-shot verbosity.
