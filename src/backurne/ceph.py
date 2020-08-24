@@ -10,8 +10,11 @@ import sh
 
 
 class Ceph():
-	def __init__(self, pool, endpoint=None):
+	def __init__(self, pool, endpoint=None, cluster_conf={}):
 		self.endpoint = endpoint
+		self.cluster = cluster_conf
+		self.compress = config['download_compression']
+
 		if pool is None:
 			pool = config['backup_cluster']['pool']
 			self.pool = pool
@@ -19,14 +22,39 @@ class Ceph():
 			self.esc = False
 		else:
 			self.backup = Ceph(None)
-			self.cmd = sh.Command('ssh').bake('-n', endpoint, 'rbd', '-p', pool)
-			self.esc = True
+			self.pool = pool
+
+			self.__get_helper__()
+			self.cmd = self.helper.bake('rbd', '-p', pool)
 
 		self.json = self.cmd.bake('--format', 'json')
-		self.pool = pool
+
+	def __get_helper__(self):
+		if self.endpoint is not None:
+			self.helper = sh.Command('ssh').bake('-n', self.endpoint)
+			self.esc = True
+			return
+
+		if self.cluster.get('get_helper') is not None:
+			get_helper_cmd = self.cluster['get_helper']['cmd']
+			get_helper_args = self.cluster['get_helper']['args']
+			helper_name = sh.Command(get_helper_cmd)(*get_helper_args)
+			helper_name = helper_name.stdout.decode('utf-8')
+
+		if self.cluster.get('use_helper') is None:
+			Log.error(f'One of fqdn or use_helper must be defined ({self.cluster}')
+			exit(1)
+
+		use_helper_cmd = self.cluster['use_helper']['cmd']
+		use_helper_args = self.cluster['use_helper']['args']
+		use_helper_args = [i if i != '%HELPERNAME%' else helper_name for i in use_helper_args]
+		self.helper = sh.Command(use_helper_cmd).bake(*use_helper_args)
+		self.esc = False
+		self.compress = False
 
 	def __str__(self):
-		return 'pool: %s, endpoint: %s' % (self.pool, self.endpoint)
+		result = f'pool {self.pool} using config {self.cluster}'
+		return result
 
 	def __call__(self, *args):
 		return self.cmd(args)
@@ -152,7 +180,7 @@ class Ceph():
 			last_snap = self.__esc(last_snap)
 			export += ['--from-snap', last_snap, '-']
 
-		if config['download_compression'] is True:
+		if self.compress is True:
 			export += ['|', 'gzip']
 			imp = f'gunzip | {self.backup.cmd} import-diff --no-progress - "{dest}"'
 		else:

@@ -124,7 +124,7 @@ class CheckProxmox(Check):
 class CheckPlain(Check):
 	def __init__(self, cluster):
 		super().__init__(cluster)
-		self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'])
+		self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'], cluster_conf=self.cluster)
 
 	def check(self):
 		data = list()
@@ -458,7 +458,7 @@ class BackupProxmox(Backup):
 class BackupPlain(Backup):
 	def __init__(self, cluster, queue, status_queue, args):
 		super().__init__(cluster, queue, status_queue, args)
-		self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'])
+		self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'], cluster_conf=self.cluster)
 
 	def list(self):
 		return self.ceph.ls()

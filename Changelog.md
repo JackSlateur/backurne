@@ -5,6 +5,7 @@ PENDING
  * fix vmfs6 support.
  * add a --debug option for one-shot verbosity.
  * rework the `map` subcommand with enhancement to the vmdk support (especially in conjunction with lvm).
+ * 'Plain' cluster can now be reached not only via SSH, but also via any user-defined way. Kubernetes is the main target here, yet it should work with anything.
 
 Version 2.1.0
 
