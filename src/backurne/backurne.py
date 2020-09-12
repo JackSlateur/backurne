@@ -461,7 +461,11 @@ class BackupPlain(Backup):
 		self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'], cluster_conf=self.cluster)
 
 	def list(self):
-		return self.ceph.ls()
+		try:
+			return self.ceph.ls()
+		except Exception as e:
+			Log.warning(e)
+			return []
 
 	@handle_exc
 	def create_snap(self, rbd):
