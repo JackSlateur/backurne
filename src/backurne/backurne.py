@@ -584,6 +584,7 @@ class Producer:
 
 		Log.debug('Producer ended')
 
+	@handle_exc
 	def __work__(self):
 		for cluster in config['live_clusters']:
 			if self.args.cluster is not None:
