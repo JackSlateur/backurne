@@ -105,6 +105,7 @@ Once you have recovered your files, you should do some cleanups:
   INFO:  Deleting restore-1 ..
 ```
 
-Finally, there are two subcommands for checks:
- - `check` shows errors if there is images on the live cluster without the daily snapshot.
+Finally, there are three subcommands for checks:
+ - `precheck` crawls images and computes the actual arrors, if there is images on the live cluster without the daily snapshot. This subcommand may be slow, depending on the dataset.
+ - `check` shows errors from `precheck`.
  - `check-snap` hashes images to check if the data on the backup cluster is the same as on the live cluster (but it is slow ..)
