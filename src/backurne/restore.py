@@ -52,7 +52,7 @@ class Restore():
 
 	def __map_vmdks(self, path):
 		if self.vmdk is None:
-			Log.debug(f'No vmdk specified, not mapping those')
+			Log.debug('No vmdk specified, not mapping those')
 			return
 
 		for vmdk in glob.glob(f'{path}/{self.vmdk}/*-flat.vmdk'):
@@ -166,20 +166,32 @@ class Restore():
 
 		return
 
-	def umount_tree(self, tree):
+	def has_pv(self, tree):
+		for i in tree.descendants:
+			if i.name.fstype == 'LVM2_member':
+				return True
+		return False
+
+
+	def umount_tree(self, tree, first_pass=False):
 		for child in tree.children:
 			if child.name.dev.endswith('.vmdk'):
-				self.umount_tree(child)
+				self.umount_tree(child, first_pass=first_pass)
 
 		for child in tree.children:
 			if child.name.dev.endswith('.vmdk'):
 				continue
-			self.umount_tree(child)
+			self.umount_tree(child, first_pass=first_pass)
 			if tree.name.fstype == 'LVM2_member':
 				deactivate_vg(tree.name.dev)
+
+		if first_pass is True and self.has_pv(tree):
+			Log.debug(f'{tree.name.dev}: pv found, return')
+			return
+
 		if tree.name.mountpoint is not None:
 			if tree.name.mountpoint in self.umounted:
-				Log.debug(f'We already umounted {tree.name.mountpoint}, probably being a LV')
+				Log.debug(f'We already umounted {tree.name.mountpoint}')
 				return
 
 			self.umounted.append(tree.name.mountpoint)
@@ -198,7 +210,7 @@ class Restore():
 			os.unlink(tree.name.dev)
 			return
 
-		if tree.name.image is not None:
+		if tree.name.image is not None and first_pass is False:
 			Log.debug(f'\t{tree.name.dev}: rbd unmap {tree.name.image}')
 			self.ceph.unmap(tree.name.dev)
 			Log.debug(f'\t{tree.name.dev}: rbd rm {tree.name.image}')
@@ -214,4 +226,7 @@ class Restore():
 			part = i.name
 			if part.parent_image != self.rbd or part.parent_snap != self.snap:
 				continue
-			self.umount_tree(i)
+			Log.debug('First pass: skip devices which contains PV')
+			self.umount_tree(i, first_pass=True)
+			Log.debug('Second pass: process all remaining devices')
+			self.umount_tree(i, first_pass=False)
