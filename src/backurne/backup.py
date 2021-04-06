@@ -79,6 +79,8 @@ class Bck():
 			delta = datetime.timedelta(days=1)
 		elif profile == 'hourly':
 			delta = datetime.timedelta(hours=1)
+		elif profile == 'monthly':
+			delta = datetime.timedelta(days=30)
 		else:  # weekly
 			delta = datetime.timedelta(days=7)
 		not_after = datetime.datetime.now() - delta

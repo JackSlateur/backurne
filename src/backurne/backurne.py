@@ -169,6 +169,8 @@ class Backup:
 			expiration = datetime.timedelta(hours=value)
 		elif profile == 'weekly':
 			expiration = datetime.timedelta(days=7 * value)
+		elif profile == 'monthly':
+			expiration = datetime.timedelta(days=30 * value)
 		else:
 			Log.warning(f'Unknown profile found, no action taken: {profile}')
 			return False
