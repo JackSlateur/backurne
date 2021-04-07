@@ -623,7 +623,7 @@ class Consumer:
 			try:
 				with Lock(snaps[0]['dest']):
 					for snap in snaps:
-						setproctitle.setproctitle(f'Backurne: downloading {snap["snap_name"]}')
+						setproctitle.setproctitle(f'Backurne: fetching {snap["backup"].source} ({snap["snap_name"]})')
 						backup = snap['backup']
 						backup.dl_snap(snap['snap_name'], snap['dest'], snap['last_snap'])
 			except filelock.Timeout:
