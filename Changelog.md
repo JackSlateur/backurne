@@ -1,5 +1,8 @@
 PENDING
 
+**Notable changes**:
+ * gzip has been replaced by zstd.
+
 **Notable changes** :
 
 Version 2.2.0

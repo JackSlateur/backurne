@@ -181,8 +181,8 @@ class Ceph():
 			export += ['--from-snap', last_snap, '-']
 
 		if self.compress is True:
-			export += ['|', 'gzip']
-			imp = f'gunzip | {self.backup.cmd} import-diff --no-progress - "{dest}"'
+			export += ['|', 'zstd']
+			imp = f'zstdcat | {self.backup.cmd} import-diff --no-progress - "{dest}"'
 		else:
 			imp = f'{self.backup.cmd} import-diff --no-progress - "{dest}"'
 
