@@ -3,6 +3,7 @@ PENDING
 **Notable changes**:
  * gzip has been replaced by zstd.
  * fix unmap when a LV is spread across multiple PV, inside the same vmdk
+ * a per backup progress is now shown in the proctitle
 
 **Notable changes** :
 

@@ -2,10 +2,14 @@ import datetime
 import dateutil.parser
 import json
 import time
+import setproctitle
+from subprocess import Popen, PIPE, DEVNULL
+import threading
+import re
+
 from .config import config
 from .log import log as Log
 from .log import report_time
-from subprocess import Popen, PIPE, DEVNULL
 import sh
 
 
@@ -167,12 +171,35 @@ class Ceph():
 		except sh.ErrorReturnCode:
 			return False
 
+	def enqueue_output(self, out):
+		original = setproctitle.getproctitle()
+
+		regexp = re.compile(r'\w* \w*: (.*)%')
+		line = ''
+		for char in iter(lambda: out.read(1), b''):
+			char = char.decode('utf-8')
+			if ord(char) != 13:
+				line += char
+				continue
+
+			if line == '':
+				continue
+
+			progress = regexp.match(line)
+			if progress is not None:
+				progress = f'{progress.group(1)}% complete'
+			else:
+				progress = line
+			setproctitle.setproctitle(f'{original} ({progress})')
+			line = ''
+		out.close()
+
 	def do_backup(self, image, snap, dest, last_snap=None):
 		# On this function, we burden ourselves with Popen
 		# I have not figured out how do fast data transfert
 		# between processes with python3-sh
 		snap = self.__esc(snap)
-		export = ['export-diff', '--no-progress', image, '--snap', snap]
+		export = ['export-diff', image, '--snap', snap]
 		export = str(self.cmd).split(' ') + export
 		if last_snap is None:
 			export += ['-', ]
@@ -187,12 +214,16 @@ class Ceph():
 			imp = f'{self.backup.cmd} import-diff --no-progress - "{dest}"'
 
 		start = datetime.datetime.now()
-		p1 = Popen(export, stdout=PIPE)
+
+		p1 = Popen(export, stdout=PIPE, stderr=PIPE, bufsize=1)
 
 		p2 = Popen(imp, stdin=p1.stdout, shell=True)
+		t = threading.Thread(target=self.enqueue_output, args=(p1.stderr,))
+		t.start()
 
 		p1.stdout.close()
 		p2.communicate()
+		t.join()
 		end = datetime.datetime.now()
 		report_time(image, self.endpoint, end - start)
 
