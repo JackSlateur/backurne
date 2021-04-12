@@ -4,6 +4,7 @@ PENDING
  * gzip has been replaced by zstd.
  * fix unmap when a LV is spread across multiple PV, inside the same vmdk
  * a per backup progress is now shown in the proctitle
+ * add a warning if some snapshot could not be deleted in time
 
 **Notable changes** :
 

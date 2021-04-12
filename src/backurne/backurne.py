@@ -75,6 +75,13 @@ class Check:
 			msg = f'Backup found for {backup} at {ceph}, yet too old (created at {when})'
 			return {'image': rbd, 'msg': msg}
 
+		snaps = ceph.backup.snap(backup.dest)
+		for snap in snaps:
+			if not Backup.is_expired(snap):
+				continue
+			msg = f'Snapshot {snap} was not deleted in time, please investigate (may be protected or mapped).'
+			return {'image': rbd, 'msg': msg}
+
 	def cmp_snap(self, backup, ceph, rbd):
 		live_snaps = ceph.snap(rbd)
 		try:
