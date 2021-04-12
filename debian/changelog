@@ -1,3 +1,12 @@
+backurne (2.2.1) UNRELEASED; urgency=medium
+
+  * gzip has been replaced by zstd.
+  * fix unmap when a LV is spread across multiple PV, inside the same vmdk
+  * a per backup progress is now shown in the proctitle
+  * add a warning if some snapshot could not be deleted in time
+
+ -- Alexandre Bruyelles <backurne@jack.fr.eu.org>  Mon, 12 Apr 2021 10:01:19 +0100
+
 backurne (2.2.0) UNRELEASED; urgency=medium
 
   * add a --cleanup option to the `backup` subcommand.

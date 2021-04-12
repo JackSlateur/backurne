@@ -1,10 +1,16 @@
 PENDING
 
 **Notable changes**:
+
+Version 2.2.1
+
+**Notable changes**:
  * gzip has been replaced by zstd.
  * fix unmap when a LV is spread across multiple PV, inside the same vmdk
  * a per backup progress is now shown in the proctitle
  * add a warning if some snapshot could not be deleted in time
+
+Thanks to Cyllene (https://www.groupe-cyllene.com/) for sponsoring this work !
 
 **Notable changes** :
 
