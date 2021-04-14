@@ -27,6 +27,7 @@ class ConsoleFormatter(logging.Formatter):
 
 		return logging.Formatter.format(self, record)
 
+
 def report_time(image, endpoint, duration):
 	if config['report_time'] is None:
 		return
@@ -35,7 +36,7 @@ def report_time(image, endpoint, duration):
 	if config['report_time'] == 'syslog':
 		syslog.syslog(syslog.LOG_INFO, msg)
 	else:
-		with open('/tmp/log', 'a') as f:
+		with open(config['report_time'], 'a') as f:
 			f.write(f'{msg}\n')
 
 
