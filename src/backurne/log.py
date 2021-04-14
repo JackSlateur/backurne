@@ -1,3 +1,4 @@
+import datetime
 import logging
 import logging.handlers
 import sys
@@ -33,6 +34,7 @@ def report_time(image, endpoint, duration):
 		return
 
 	msg = f'Image {image} from {endpoint} backed up, elasped time: {duration}'
+	msg = f'{datetime.datetime.now()}: {msg}'
 	if config['report_time'] == 'syslog':
 		syslog.syslog(syslog.LOG_INFO, msg)
 	else:
