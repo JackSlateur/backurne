@@ -110,6 +110,20 @@ Any way, once you know the target rbd image name, you will have to :\
  - export and import the image, using `rbd export <image> --snap <snap> - | ssh <ceph-host> rbd import - <dest-image>`
 
 
+Graph and reporting
+---
+
+![alt text](https://github.com/JackSlateur/backurne/blob/master/graph_in_progress.png?raw=true)
+![alt text](https://github.com/JackSlateur/backurne/blob/master/graph_duration.png?raw=true)
+
+An ugly grafana dashboard is provided in `graph/grafana-backurne.json`, data has stored in an influxdb database.\
+It provides two informations:\
+ - the number of backups currently running, using data from telegraf (both the script and the config shall be found in `graph/telegraf/*`).
+ - the duration of each backup
+
+Merge requests or ideas of improvement are most welcome here.
+
+
 Note
 ---
 On Proxmox, LXC is not yet supported. Only Qemu so far :/

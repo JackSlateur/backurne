@@ -43,6 +43,14 @@ def load_config():
 			'post_vm': None,
 		},
 		'report_time': 'syslog',
+		'influxdb': {
+			'host': None,
+			'db': None,
+			'port': 8086,
+			'tls': False,
+			'verify_tls': True,
+			'mtls': None,
+		},
 	}
 
 	custom = imp.new_module('custom')

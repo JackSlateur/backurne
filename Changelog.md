@@ -1,6 +1,7 @@
 PENDING
 
 **Notable changes**:
+ * Report time to influxdb
 
 Version 2.2.1
 

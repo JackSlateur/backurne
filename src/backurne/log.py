@@ -29,6 +29,35 @@ class ConsoleFormatter(logging.Formatter):
 		return logging.Formatter.format(self, record)
 
 
+def report_to_influx(image, endpoint, duration):
+	from influxdb import InfluxDBClient
+
+	conf = config['influxdb']
+
+	if conf['host'] is None or conf['db'] is None:
+		log.warning('influxdb: host or db are not defined, cannot do proper reporting')
+		return
+
+	if conf['mtls'] is None:
+		influx = InfluxDBClient(conf['host'], conf['port'], database=conf['db'], ssl=conf['tls'], verify_ssl=conf['verify_tls'])
+	else:
+		influx = InfluxDBClient(conf['host'], conf['port'], database=conf['db'], ssl=conf['tls'], verify_ssl=conf['verify_tls'], cert=conf['mtls'])
+
+	data = [{
+		'measurement': 'backurne',
+		'tags': {
+			'image': image,
+			'endpoint': endpoint,
+		},
+		'time': datetime.datetime.now().replace(microsecond=0).isoformat(),
+		'fields': {
+			'duration': int(duration.total_seconds()),
+		},
+	}]
+
+	influx.write_points(data)
+
+
 def report_time(image, endpoint, duration):
 	if config['report_time'] is None:
 		return
@@ -37,6 +66,8 @@ def report_time(image, endpoint, duration):
 	msg = f'{datetime.datetime.now()}: {msg}'
 	if config['report_time'] == 'syslog':
 		syslog.syslog(syslog.LOG_INFO, msg)
+	elif config['report_time'] == 'influxdb':
+		report_to_influx(image, endpoint, duration)
 	else:
 		with open(config['report_time'], 'a') as f:
 			f.write(f'{msg}\n')
