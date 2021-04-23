@@ -79,7 +79,7 @@ class Check:
 		for snap in snaps:
 			if not Backup.is_expired(snap):
 				continue
-			msg = f'Snapshot {snap} was not deleted in time, please investigate (may be protected or mapped).'
+			msg = f'Snapshot {backup.dest} / {snap} was not deleted in time, please investigate (may be protected or mapped).'
 			return {'image': rbd, 'msg': msg}
 
 	def cmp_snap(self, backup, ceph, rbd):
