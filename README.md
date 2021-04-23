@@ -22,7 +22,7 @@ Supported features
 - External custom processing via hooks.
 - LVM support: backup's lvs are detected and mapped (if possible) for further exploration. See below.
 - vmware support: vmfs are detected and supported. Each vmdk are also mapped and mounted. See below.
-
+- Microsoft dynamic disks support: each logical disk will be mapped and mounted. See below.
 - VM tracking, for those who uses a single Proxmox cluster with multiple Ceph backend.
 
 Encryption and compression at rest are also seamlessly supported via Bluestore OSDs (see https://ceph.com/community/new-luminous-bluestore/)
@@ -31,7 +31,7 @@ Required packages
 ---
 
 Core: python (>=3.7), python3-dateutil, python3-termcolor, python3-prettytable, python3-requests, python3-proxmoxer, python3-psutil, python3-anytree (from https://github.com/c0fec0de/anytree, .deb for buster attached for convenience), zstd for compression \
-For mapping (optional): kpartx, rbd-nbd (Mimic or later)\
+For mapping (optional): kpartx, rbd-nbd (Mimic or later), lvm2, vmfs-tools, vmfs6-tools, ldmtool\
 For the REST API: python3-flask, python3-flask-autoindex\
 For bash autocompletion: jq
 
@@ -78,7 +78,7 @@ Used technology
  - `ssh` is used to transfert the snapshots between the live clusters and the backup cluster. `RBD` can be manipulated over TCP/IP, but without encryption nor compression, thus this solution was not kept.
  - `xxhash` (or other, see the configuration) is used to check the consistancy between snapshots.
  - `rbd-nbd` is used to map a specific backup and inspect its content.
- - `kpartx`, `qemu-img`, `qemu-nbd`, `vmfs-tools` and `vmfs6-tools` are used for vmware exploration.
+ - `kpartx`, `qemu-img`, `qemu-nbd`, `vmfs-tools` and `vmfs6-tools` are used for vmware exploration, `ldmtool` is used to map microsoft dynamic disks.
 
 
 vmware support
@@ -97,6 +97,15 @@ The same device may be seen at many layer by the device-mapped code.\
 To activate some LV, especially if the lives inside vmdk (see vmware support), you will need to tell LVM to allow such behavior.\
 By default, LVM refuses to activate LVs that shows up in multiple PVs.\
 To allow this, edit `/etc/lvm/lvm.conf`, and set `allow_changes_with_duplicate_pvs` to `1`.\
+
+
+Microsoft LDM support
+---
+
+Microsoft dynamic disks are supported. You will need the `ldmtool` to map those.\
+A single dynamic disk as well as a dynamic disk spread across multiple block devices (inside a VMFS for instance) are supported.\
+However, mapping multiple unrelated dynamic disk is not supported. For instance, if you map a backup A, and an unrelated backup B,\
+while both of them contains dynamic disks, the behavior is unexpected.\
 
 
 "Bare-metal" restore

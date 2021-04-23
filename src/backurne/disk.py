@@ -12,14 +12,14 @@ from .log import log as Log
 from .log import has_debug
 
 
-fields = ['dev', 'fstype', 'mountpoint', 'vmfs_fuse', 'image', 'parent_image', 'parent_snap', 'mapped', 'qemu_nbd', 'size']
+fields = ['dev', 'fstype', 'mountpoint', 'vmfs_fuse', 'image', 'parent_image', 'parent_snap', 'mapped', 'qemu_nbd', 'size', 'ldm']
 Part = namedtuple('FS', fields, defaults=(None,) * len(fields))
 
 
 def get_fs_info(dev):
 	if dev is None:
 		return []
-	info = lsblk('-I', 8, '-p', '-o', '+NAME,FSTYPE,SIZE,MOUNTPOINT', '-J', dev)
+	info = lsblk('-I', 8, '-p', '-o', '+NAME,FSTYPE,SIZE,MOUNTPOINT,PARTTYPE', '-J', dev)
 	info = json.loads(info.stdout)
 	return info['blockdevices']
 
@@ -146,13 +146,20 @@ def get_partitions(dev, node, extended=True, mapped=None, qemu_nbd=None):
 		if 'children' not in part:
 			continue
 
+		# A microsoft dynamic disk has a single partition with type 0x42
+		if part['children'][0]['parttype'] == '0x42':
+			ldm = True
+		else:
+			ldm = None
+
 		if extended is False:
 			sub_node = node
 		else:
-			sub_node = Node(Part(dev=dev, mapped=mapped, qemu_nbd=qemu_nbd, size=part['size']), parent=node)
+			sub_node = Node(Part(dev=dev, mapped=mapped, qemu_nbd=qemu_nbd, size=part['size'], ldm=ldm), parent=node)
 		part['children'] = filter_children(part['children'], mapped)
-		for part in part['children']:
-			get_partitions(part['name'], sub_node, extended, mapped)
+		if not ldm or True:
+			for part in part['children']:
+				get_partitions(part['name'], sub_node, extended, mapped)
 
 
 def wait_dev(dev):

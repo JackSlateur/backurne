@@ -92,6 +92,11 @@ class Restore():
 		if info['fstype'] == 'swap':
 			return False
 
+		if info['parttype'] == '0x42':
+			Log.debug('windows dynamic disk detected: scanning and creating devices')
+			sh.Command('ldmtool')('scan')
+			sh.Command('ldmtool')('create', 'all')
+			return False
 		if info['fstype'] is not None and info['mountpoint'] is None and info['fstype'] != 'LVM2_member':
 			tmp_dir = self.get_tmpdir()
 			if info['fstype'] == 'VMFS_volume_member':
@@ -106,7 +111,10 @@ class Restore():
 				sh.Command('mount')(dev, tmp_dir)
 			except Exception as e:
 				os.rmdir(tmp_dir)
-				Log.warning(e)
+				if info['fstype'] == 'ntfs':
+					Log.debug(e)
+				else:
+					Log.warn(e)
 				pass
 
 			return True
@@ -173,18 +181,24 @@ class Restore():
 				return True
 		return False
 
-
 	def umount_tree(self, tree, first_pass=False):
 		for child in tree.children:
 			if child.name.dev.endswith('.vmdk'):
 				self.umount_tree(child, first_pass=first_pass)
 
+		ldm = False
 		for child in tree.children:
+			if child.name.ldm is True and first_pass is True:
+				ldm = True
 			if child.name.dev.endswith('.vmdk'):
 				continue
 			self.umount_tree(child, first_pass=first_pass)
 			if tree.name.fstype == 'LVM2_member':
 				deactivate_vg(tree.name.dev)
+
+		if ldm is True:
+			Log.debug('windows dynamic disk detected: removing all devices')
+			sh.Command('ldmtool')('remove', 'all')
 
 		if first_pass is True and self.has_pv(tree):
 			Log.debug(f'{tree.name.dev}: pv found, return')
