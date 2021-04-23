@@ -42,6 +42,10 @@ def report_time(image, endpoint, duration):
 			f.write(f'{msg}\n')
 
 
+def has_debug(log):
+	return log.level == logging.DEBUG
+
+
 log = logging.getLogger('backurne')
 
 slog = logging.handlers.SysLogHandler(address='/dev/log')

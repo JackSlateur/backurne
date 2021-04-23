@@ -9,6 +9,7 @@ from collections import namedtuple
 from sh import lsblk, rbd
 from .ceph import Ceph
 from .log import log as Log
+from .log import has_debug
 
 
 fields = ['dev', 'fstype', 'mountpoint', 'vmfs_fuse', 'image', 'parent_image', 'parent_snap', 'mapped', 'qemu_nbd', 'size']
@@ -178,7 +179,10 @@ def print_node(pre, _node):
 	else:
 		dev = node.dev
 		fstype = 'fstype %s' % (node.fstype,)
-	Log.info('%s%s %s(%s, size %s, nbd %s, vmfs %s, mnt %s, real dev %s)' % (pre, dev, msg, fstype, node.size, node.qemu_nbd, node.vmfs_fuse, node.mountpoint, node.dev))
+	if has_debug(Log):
+		Log.info('%s%s %s(%s, size %s, nbd %s, vmfs %s, mnt %s, real dev %s, ldm %s)' % (pre, dev, msg, fstype, node.size, node.qemu_nbd, node.vmfs_fuse, node.mountpoint, node.dev, node.ldm))
+	else:
+		Log.info('%s%s %s(%s, size %s)' % (pre, dev, msg, fstype, node.size))
 
 
 def print_mapped(mapped):
