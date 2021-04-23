@@ -105,6 +105,7 @@ class Restore():
 			try:
 				sh.Command('mount')(dev, tmp_dir)
 			except Exception as e:
+				os.rmdir(tmp_dir)
 				Log.warning(e)
 				pass
 
