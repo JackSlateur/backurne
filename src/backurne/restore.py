@@ -207,7 +207,10 @@ class Restore():
 			Log.debug(f'\t{tree.name.dev}: qemu-nbd --disconnect {tree.name.qemu_nbd}')
 			sh.Command('qemu-nbd')('--disconnect', tree.name.qemu_nbd)
 			Log.debug(f'\t{tree.name.dev}: rm {tree.name.dev}')
-			os.unlink(tree.name.dev)
+			try:
+				os.unlink(tree.name.dev)
+			except FileNotFoundError:
+				pass
 			return
 
 		if tree.name.image is not None and first_pass is False:
