@@ -215,7 +215,7 @@ class Ceph():
 
 		start = datetime.datetime.now()
 
-		p1 = Popen(export, stdout=PIPE, stderr=PIPE, bufsize=1)
+		p1 = Popen(export, stdout=PIPE, stderr=PIPE, bufsize=0)
 
 		p2 = Popen(imp, stdin=p1.stdout, shell=True)
 		t = threading.Thread(target=self.enqueue_output, args=(p1.stderr,))
