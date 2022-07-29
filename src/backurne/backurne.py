@@ -609,21 +609,21 @@ class Producer:
 
 	@handle_exc
 	def __work__(self):
-		for cluster in config['live_clusters']:
-			if self.args.cluster is not None:
-				if cluster['name'] != self.args.cluster:
-					Log.debug(f'Skipping cluster {cluster["name"]} due to --cluster')
-					continue
-			Log.debug(f'Backuping {cluster["type"]}: {cluster["name"]}')
-			if cluster['type'] == 'proxmox':
-				bidule = BackupProxmox(cluster, self.regular_queue, self.priority_queue, self.status_queue, self.args)
-			else:
-				bidule = BackupPlain(cluster, self.regular_queue, self.priority_queue, self.status_queue, self.args)
-			bidule.create_snaps()
+		if self.args.cluster is not None:
+			if self.cluster['name'] != self.args.cluster:
+				Log.debug(f'Skipping cluster {self.cluster["name"]} due to --cluster')
+				return
+		Log.debug(f'Backuping {self.cluster["type"]}: {self.cluster["name"]}')
+		if self.cluster['type'] == 'proxmox':
+			bidule = BackupProxmox(self.cluster, self.regular_queue, self.priority_queue, self.status_queue, self.args)
+		else:
+			bidule = BackupPlain(self.cluster, self.regular_queue, self.priority_queue, self.status_queue, self.args)
+		bidule.create_snaps()
 
 
 class Consumer:
 	def __init__(self, params):
+		self.id = params['id']
 		self.cluster = params['cluster']
 		self.regular_queue = params['regular_q']
 		self.priority_queue = params['priority_q']
@@ -638,7 +638,12 @@ class Consumer:
 	def __call__(self):
 		Log.debug('Consumer started')
 		setproctitle.setproctitle('Backurne Consumer')
-		self.__work__()
+		try:
+			lockname = f'Consumer-{self.cluster["name"]}-{self.id}'
+			with Lock(lockname):
+				self.__work__()
+		except filelock.Timeout:
+			Log.debug(f'Cannot lock: {lockname}, another instance is running')
 		Log.debug('Consumer ended')
 
 	def __work__(self):
@@ -829,6 +834,7 @@ def main():
 				producer.start()
 
 				for i in range(0, config['live_worker']):
+					params['id'] = i
 					pid = multiprocessing.Process(target=Consumer(params))
 					atexit.register(pid.terminate)
 					live_workers.append(pid)
