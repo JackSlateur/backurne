@@ -35,6 +35,7 @@ def profile():
 				'hourly': {
 					'count': 48,
 					'max_on_live': 0,
+					'priority': 'high',
 				},
 			}
 		}

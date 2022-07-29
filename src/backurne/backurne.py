@@ -159,9 +159,10 @@ def run_hook(kind, vmname, diskname):
 
 
 class Backup:
-	def __init__(self, cluster, queue, status_queue, args=None):
+	def __init__(self, cluster, regular_queue, priority_queue, status_queue, args=None):
 		self.cluster = cluster
-		self.queue = queue
+		self.regular_queue = regular_queue
+		self.priority_queue = priority_queue
 		self.status_queue = status_queue
 		self.args = args
 
@@ -193,6 +194,7 @@ class Backup:
 
 	def _create_snap(self, bck, profiles, pre_vm_hook):
 		todo = list()
+		is_high_prio = False
 
 		hooked = False
 
@@ -231,6 +233,7 @@ class Backup:
 						run_hook('post_disk', bck.vm['name'], bck.rbd)
 					except Exception:
 						pass
+
 					if dest is not None:
 						todo.append({
 							'dest': dest,
@@ -238,10 +241,18 @@ class Backup:
 							'snap_name': snap_name,
 							'backup': bck,
 						})
+
+						priority = value.get('priority')
+						if priority == 'high':
+							is_high_prio = True
 		except filelock.Timeout:
+			Log.info(f'unable to acquire lock for {bck.vm["name"]}')
 			pass
 		if len(todo) != 0:
-			self.queue.put(todo)
+			if is_high_prio:
+				self.priority_queue.put(todo)
+			else:
+				self.regular_queue.put(todo)
 		setproctitle.setproctitle('Backurne idle producer')
 		return hooked
 
@@ -355,8 +366,8 @@ class Backup:
 
 
 class BackupProxmox(Backup):
-	def __init__(self, cluster, queue, status_queue, args):
-		super().__init__(cluster, queue, status_queue, args)
+	def __init__(self, cluster, regular_queue, priority_queue, status_queue, args):
+		super().__init__(cluster, regular_queue, priority_queue, status_queue, args)
 
 	def __fetch_profiles(self, vm, disk):
 		profiles = list(config['profiles'].items())
@@ -465,8 +476,8 @@ class BackupProxmox(Backup):
 
 
 class BackupPlain(Backup):
-	def __init__(self, cluster, queue, status_queue, args):
-		super().__init__(cluster, queue, status_queue, args)
+	def __init__(self, cluster, regular_queue, priority_queue, status_queue, args):
+		super().__init__(cluster, regular_queue, priority_queue, status_queue, args)
 		self.ceph = Ceph(self.cluster['pool'], endpoint=self.cluster['fqdn'], cluster_conf=self.cluster)
 
 	def list(self):
@@ -573,9 +584,11 @@ class Lock:
 
 
 class Producer:
-	def __init__(self, queue, status_queue, args):
-		self.queue = queue
-		self.status_queue = status_queue
+	def __init__(self, params, args):
+		self.cluster = params['cluster']
+		self.regular_queue = params['regular_q']
+		self.priority_queue = params['priority_q']
+		self.status_queue = params['status_q']
 		self.args = args
 
 	@handle_exc
@@ -587,8 +600,9 @@ class Producer:
 		# That way, all of them shall die
 		for i in range(0, config['live_worker']):
 			try:
-				self.queue.put(None)
-			except Exception:
+				self.regular_queue.put(None)
+				self.priority_queue.put(None)
+			except:
 				Log.error('cannot end a live_worker! This is a critical bug, we will never die')
 
 		Log.debug('Producer ended')
@@ -602,16 +616,23 @@ class Producer:
 					continue
 			Log.debug(f'Backuping {cluster["type"]}: {cluster["name"]}')
 			if cluster['type'] == 'proxmox':
-				bidule = BackupProxmox(cluster, self.queue, self.status_queue, self.args)
+				bidule = BackupProxmox(cluster, self.regular_queue, self.priority_queue, self.status_queue, self.args)
 			else:
-				bidule = BackupPlain(cluster, self.queue, self.status_queue, self.args)
+				bidule = BackupPlain(cluster, self.regular_queue, self.priority_queue, self.status_queue, self.args)
 			bidule.create_snaps()
 
 
 class Consumer:
-	def __init__(self, queue, status_queue):
-		self.queue = queue
-		self.status_queue = status_queue
+	def __init__(self, params):
+		self.cluster = params['cluster']
+		self.regular_queue = params['regular_q']
+		self.priority_queue = params['priority_q']
+		self.status_queue = params['status_q']
+
+		# Track the queue status
+		# When both are dead, the worker can die in peace
+		self.priority_alive = True
+		self.regular_alive = True
 
 	@handle_exc
 	def __call__(self):
@@ -622,10 +643,35 @@ class Consumer:
 
 	def __work__(self):
 		while True:
-			setproctitle.setproctitle('Backurne idle consumer')
-			snaps = self.queue.get()
-			if snaps is None:
+			setproctitle.setproctitle(f'Backurne idle consumer ({self.cluster["name"]})')
+
+			if self.priority_alive is False and self.regular_alive is False:
 				break
+
+			snaps = []
+			if self.priority_alive is True:
+				try:
+					snaps = self.priority_queue.get_nowait()
+				except queue.Empty:
+					pass
+
+				if snaps is None:
+					self.priority_alive = False
+					continue
+
+			if len(snaps) == 0 and self.regular_alive is True:
+				try:
+					snaps = self.regular_queue.get_nowait()
+				except queue.Empty:
+					pass
+
+				if snaps is None:
+					self.regular_alive = False
+					continue
+
+			if len(snaps) == 0:
+				time.sleep(1)
+				continue
 
 			try:
 				with Lock(snaps[0]['dest']):
@@ -766,19 +812,27 @@ def main():
 
 		manager = multiprocessing.Manager()
 		atexit.register(manager.shutdown)
-		queue = manager.Queue()
+
+		live_workers = list()
 
 		with Status_updater(manager, 'images processed') as status_queue:
-			producer = multiprocessing.Process(target=Producer(queue, status_queue, args))
-			atexit.register(producer.terminate)
-			producer.start()
+			for cluster in config['live_clusters']:
+				params = {
+					'cluster': cluster,
+					'regular_q': manager.Queue(),
+					'priority_q': manager.Queue(),
+					'status_q': status_queue,
+				}
 
-			live_workers = list()
-			for i in range(0, config['live_worker']):
-				pid = multiprocessing.Process(target=Consumer(queue, status_queue))
-				atexit.register(pid.terminate)
-				live_workers.append(pid)
-				pid.start()
+				producer = multiprocessing.Process(target=Producer(params, args))
+				atexit.register(producer.terminate)
+				producer.start()
+
+				for i in range(0, config['live_worker']):
+					pid = multiprocessing.Process(target=Consumer(params))
+					atexit.register(pid.terminate)
+					live_workers.append(pid)
+					pid.start()
 
 			# Workers will exit upon a None reception
 			# When all of them are done, we are done
@@ -798,9 +852,9 @@ def main():
 
 				Log.debug(f'Expire snapshots from live {cluster["type"]}: {cluster["name"]}')
 				if cluster['type'] == 'proxmox':
-					bidule = BackupProxmox(cluster, None, status_queue, args)
+					bidule = BackupProxmox(cluster, None, None, status_queue, args)
 				else:
-					bidule = BackupPlain(cluster, None, status_queue, args)
+					bidule = BackupPlain(cluster, None, None, status_queue, args)
 				bidule.expire_live()
 
 		if args.cleanup or args.cluster is None and args.profile is None and args.vmid is None:
