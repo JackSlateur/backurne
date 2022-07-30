@@ -1,7 +1,16 @@
 PENDING
 
 **Notable changes**:
+
+Version 2.3.0
+
+**Notable changes**:
  * Report time to influxdb
+ * Support Microsoft dynamic disks (LDM)
+ * Implement tasks priority
+ * Reimplement the workers logic, with a per-cluster pool
+
+Thanks to Cyllene (https://www.groupe-cyllene.com/) for sponsoring this work !
 
 Version 2.2.1
 

@@ -1,3 +1,12 @@
+backurne (2.3.0) UNRELEASED; urgency=medium
+
+  * Report time to influxdb
+  * Support Microsoft dynamic disks (LDM)
+  * Implement tasks priority
+  * Reimplement the workers logic, with a per-cluster pool
+
+ -- Alexandre Bruyelles <backurne@jack.fr.eu.org>  Sat, 30 Jul 2022 11:08:19 +0100
+
 backurne (2.2.1) UNRELEASED; urgency=medium
 
   * gzip has been replaced by zstd.
