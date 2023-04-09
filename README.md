@@ -33,7 +33,8 @@ Required packages
 Core: python (>=3.7), python3-dateutil, python3-termcolor, python3-prettytable, python3-requests, python3-proxmoxer, python3-psutil, python3-anytree (from https://github.com/c0fec0de/anytree, .deb for buster attached for convenience), zstd for compression \
 For mapping (optional): kpartx, rbd-nbd (Mimic or later), lvm2, vmfs-tools, vmfs6-tools, ldmtool\
 For the REST API: python3-flask, python3-flask-autoindex\
-For bash autocompletion: jq
+For bash autocompletion: jq\
+For bandwith limitation: python3-cgroupspy (from https://github.com/cloudsigma/cgroupspy), cgroupfs-mount (or other way to mount the net cgroup)
 
 
 Installation

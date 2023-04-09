@@ -24,6 +24,8 @@ from .restore import Restore
 from .backup import Bck
 from .disk import print_mapped, prepare_tree_to_json, get_mapped
 from . import stats
+from .cgroups import Cgroups
+from .tc import Tc
 
 
 VERSION = '2.3.0'
@@ -634,6 +636,10 @@ class Consumer:
 		self.priority_alive = True
 		self.regular_alive = True
 
+		if 'tc_minor' in self.cluster:
+			classid = int(f'0x10{format(self.cluster["tc_minor"], "04x")}', 16)
+			params['cg'].setup_netcls(self.cluster['name'], classid)
+
 	@handle_exc
 	def __call__(self):
 		Log.debug('Consumer started')
@@ -820,13 +826,21 @@ def main():
 
 		live_workers = list()
 
+		cg = Cgroups()
+
 		with Status_updater(manager, 'images processed') as status_queue:
 			for cluster in config['live_clusters']:
+				if 'tc_minor' in cluster and 'bwlimit' in cluster:
+					iface = cluster.get('tc_iface', 'eth0')
+					tc = Tc(iface, cluster)
+					tc.setup()
+
 				params = {
 					'cluster': cluster,
 					'regular_q': manager.Queue(),
 					'priority_q': manager.Queue(),
 					'status_q': status_queue,
+					'cg': cg,
 				}
 
 				producer = multiprocessing.Process(target=Producer(params, args))
