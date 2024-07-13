@@ -1,6 +1,6 @@
 import collections
 import os
-import imp
+import types
 
 
 # Random code from https://gist.github.com/angstwad/bf22d1822c38a92ec0a9
@@ -53,7 +53,7 @@ def load_config():
 		},
 	}
 
-	custom = imp.new_module('custom')
+	custom = types.ModuleType('custom')
 	try:
 		exec(open('/etc/backurne/backurne.conf', 'r').read(), custom.__dict__)
 	except FileNotFoundError:
