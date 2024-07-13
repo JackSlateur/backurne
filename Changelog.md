@@ -3,6 +3,12 @@ PENDING
 
 **Notable changes**:
 
+Version 2.3.1
+---
+
+**Notable changes**:
+ * Support python 3.12
+
 Version 2.3.0
 ---
 

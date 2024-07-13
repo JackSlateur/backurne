@@ -1,3 +1,9 @@
+backurne (2.3.1) UNRELEASED; urgency=medium
+
+  * Support python 3.12
+
+ -- Alexandre Bruyelles <backurne@jack.fr.eu.org>  Sat, 13 Jul 2024 17:08:19 +0100
+
 backurne (2.3.0) UNRELEASED; urgency=medium
 
   * Report time to influxdb
