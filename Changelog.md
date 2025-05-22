@@ -3,6 +3,12 @@ PENDING
 
 **Notable changes**:
 
+Version 2.3.2
+---
+
+**Notable changes**:
+ * Avoid deprecated use of `rnd nbd` command
+
 Version 2.3.1
 ---
 

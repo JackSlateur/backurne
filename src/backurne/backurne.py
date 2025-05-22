@@ -26,7 +26,7 @@ from .disk import print_mapped, prepare_tree_to_json, get_mapped
 from . import stats
 
 
-VERSION = '2.3.1'
+VERSION = '2.3.2'
 
 
 def handle_exc(func):

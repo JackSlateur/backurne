@@ -1,3 +1,9 @@
+backurne (2.3.2) UNRELEASED; urgency=medium
+
+  * Avoid deprecated use of `rnd nbd` command
+
+ -- Alexandre Bruyelles <backurne@jack.fr.eu.org>  Thu, 22 May 2025 17:08:19 +0100
+
 backurne (2.3.1) UNRELEASED; urgency=medium
 
   * Support python 3.12

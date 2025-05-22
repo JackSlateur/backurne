@@ -117,7 +117,7 @@ class Ceph():
 			Log.error('BUG: cannot map via ssh')
 			exit(1)
 
-		cmd = ['nbd', 'map', image]
+		cmd = ['device', '-t', 'nbd', 'map', image]
 		cmd = str(self.cmd).split(' ') + cmd
 
 		Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
@@ -133,7 +133,7 @@ class Ceph():
 			Log.error('BUG: cannot unmap via ssh')
 			exit(1)
 
-		sh.Command('rbd-nbd')('unmap', dev)
+		self.cmd('device', '-t', 'nbd', 'unmap', dev)
 
 		# Wait a bit to make sure the dev is effectively gone
 		time.sleep(1)
