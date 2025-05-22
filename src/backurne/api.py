@@ -3,6 +3,7 @@
 from flask import Flask
 from flask import Blueprint
 from flask_autoindex import AutoIndexBlueprint
+import urllib.parse
 import json
 from .restore import Restore
 from .disk import prepare_tree_to_json, get_mapped
@@ -31,8 +32,26 @@ def ls():
 	return send_json(result)
 
 
+@app.route('/backup/host/<host>/')
+def get(host):
+	restore = Restore()
+	data = restore.ls()
+
+	result = list()
+	for i in data:
+		if i['ident'] == host:
+			result.append({
+				'ident': i['ident'],
+				'disk': i['disk'],
+				'uuid': i['uuid'],
+			})
+
+	return send_json(result)
+
+
 @app.route('/backup/<rbd>/')
 def ls_snaps(rbd):
+	rbd = urllib.parse.unquote(rbd)
 	restore = Restore(rbd)
 	data = restore.ls()
 
