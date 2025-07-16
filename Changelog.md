@@ -3,6 +3,12 @@ PENDING
 
 **Notable changes**:
 
+Version 2.3.3
+---
+
+**Notable changes**:
+ * Improve the API
+
 Version 2.3.2
 ---
 

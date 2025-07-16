@@ -1,3 +1,9 @@
+backurne (2.3.3) UNRELEASED; urgency=medium
+
+  * Improve the API
+
+ -- Alexandre Bruyelles <backurne@jack.fr.eu.org>  Wed, 16 Jul 2025 15:30:19 +0100
+
 backurne (2.3.2) UNRELEASED; urgency=medium
 
   * Avoid deprecated use of `rnd nbd` command
