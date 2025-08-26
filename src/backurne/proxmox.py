@@ -33,8 +33,10 @@ class Proxmox():
 				continue
 			name = storage['storage']
 			endpoint = self.__get_ceph_endpoint(name)
-
-			result[name] = Ceph(storage['pool'], endpoint=endpoint)
+			namespace = None
+			if 'namespace' in storage:
+				namespace = storage['namespace']
+			result[name] = Ceph(storage['pool'], namespace=namespace, endpoint=endpoint)
 		return result
 
 	def nodes(self):

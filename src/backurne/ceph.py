@@ -14,7 +14,7 @@ import sh
 
 
 class Ceph():
-	def __init__(self, pool, endpoint=None, cluster_conf={}):
+	def __init__(self, pool, namespace=None, endpoint=None, cluster_conf={}):
 		self.endpoint = endpoint
 		self.cluster = cluster_conf
 		self.compress = config['download_compression']
@@ -30,6 +30,9 @@ class Ceph():
 
 			self.__get_helper__()
 			self.cmd = self.helper.bake('rbd', '-p', pool)
+		if namespace is not None:
+			self.namespace = namespace
+			self.cmd = self.cmd.bake('--namespace', namespace)
 
 		self.json = self.cmd.bake('--format', 'json')
 
