@@ -3,6 +3,12 @@ PENDING
 
 **Notable changes**:
 
+Version 2.4.0
+---
+
+**Notable changes**:
+ * Add support for RBD namespaces
+
 Version 2.3.3
 ---
 

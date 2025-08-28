@@ -1,3 +1,9 @@
+backurne (2.4.0) UNRELEASED; urgency=medium
+
+  * Add support for RBD namespaces
+
+ -- Alexandre Bruyelles <backurne@jack.fr.eu.org>  Thu, 28 Aug 2025 12:54:19 +0200
+
 backurne (2.3.3) UNRELEASED; urgency=medium
 
   * Improve the API
