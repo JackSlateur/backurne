@@ -1,31 +1,31 @@
 {
   "__inputs": [
     {
-      "name": "DS_TELEGRAF_HOSTING",
-      "label": "telegraf_hosting",
       "description": "",
-      "type": "datasource",
+      "label": "telegraf_hosting",
+      "name": "DS_TELEGRAF_HOSTING",
       "pluginId": "influxdb",
-      "pluginName": "InfluxDB"
+      "pluginName": "InfluxDB",
+      "type": "datasource"
     }
   ],
   "__requires": [
     {
-      "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
+      "type": "grafana",
       "version": "7.3.1"
     },
     {
-      "type": "panel",
       "id": "graph",
       "name": "Graph",
+      "type": "panel",
       "version": ""
     },
     {
-      "type": "datasource",
       "id": "influxdb",
       "name": "InfluxDB",
+      "type": "datasource",
       "version": "1.0.0"
     }
   ],

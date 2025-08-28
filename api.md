@@ -1,7 +1,7 @@
 # Rest API documentation
 
 #### Note
-No authentification nor authorization is made in any way. You should use a proxy, with basic auth and TLS.\
+No authentication nor authorization is made in any way. You should use a proxy, with basic auth and TLS.\
 Lastly, the API code **must** be run as root (well, it must CAP_SYS_ADMIN), because it will handle block devices, mount filesystems etc.
 
 ## Listing backed up disks

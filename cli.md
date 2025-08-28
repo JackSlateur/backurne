@@ -1,6 +1,6 @@
 # Command line interface
 
-First of all, we should create some backups. Here, we have two backup policy : a daily for 30 days, and a hourly for 48 hours, this is the defaut:
+First of all, we should create some backups. Here, we have two backup policy : a daily for 30 days, and a hourly for 48 hours, this is the default:
 ```
 35% [jack:~/backurne]./backurne backup
   INFO:  Processing proxmox: infrakvm1
@@ -18,7 +18,7 @@ Importing image diff: 100% complete...done.
 Exporting image: 100% complete...done.
 Importing image diff: 100% complete...done.
   INFO:  Export infraceph1:vm-136-disk-1 complete
-  INFO:  Deleting vm-136-disk-1@backup;daily;30;2018-06-01T15:44:26.072348 .. 
+  INFO:  Deleting vm-136-disk-1@backup;daily;30;2018-06-01T15:44:26.072348 ..
   INFO:  Expiring our snapshots
 ```
 As you can see, on the first backup is "full", the other is incremental (based on the full made seconds ago, thus very efficient).\
@@ -75,7 +75,7 @@ We see that both snapshots were created almost at the same time.
 Now, we would like to inspect a snapshot's content.
 ```
 32% [jack:~/backurne]sudo ./
-backurne map 28b868e3-c145-4ea7-8dff-e5ae3b8093af\;scsi0\;nsint5 backup\;daily\;30\;2019-12-30T06\:00\:04.802699 
+backurne map 28b868e3-c145-4ea7-8dff-e5ae3b8093af\;scsi0\;nsint5 backup\;daily\;30\;2019-12-30T06\:00\:04.802699
   INFO:  Mapping 28b868e3-c145-4ea7-8dff-e5ae3b8093af;scsi0;nsint5@backup;daily;30;2019-12-30T06:00:04.802699 ..
   INFO:  rbd 28b868e3-c145-4ea7-8dff-e5ae3b8093af;scsi0;nsint5 / snap backup;daily;30;2019-12-30T06:00:04.802699
   INFO:  └── /dev/nbd0 (fstype None, size 20G)

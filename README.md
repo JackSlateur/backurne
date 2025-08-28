@@ -39,7 +39,7 @@ For bash autocompletion: jq
 Installation
 ---
 
- - Check out the **Authentification** parts.
+ - Check out the **Authentication** parts.
  - Clone the source, edit the configuration
  - Setup a Ceph cluster, used to store the backups
  - Profit ?
@@ -49,16 +49,16 @@ Configuration
 
 See [custom.conf.sample](custom.conf.sample)
 
-Authentification, and where should I run what
+Authentication, and where should I run what
 ---
 
 `backurne` interacts with the backup cluster via the `rbd` command line. It must have the required configuration at /etc/ceph/ceph.conf and the needed keyring.\
 It is assumed that `backurne` will be run on a Ceph node (perhaps a monitor), but this is not strictly required (those communications will not be encrypted nor compressed).
 
-`backurne` connects to proxmox's cluster via their HTTP API. No data is exchanged via this link, it is purely used for "control" (listing VM, listing disks, fetching informations etc).
+`backurne` connects to proxmox's cluster via their HTTP API. No data is exchanged via this link, it is purely used for "control" (listing VM, listing disks, fetching information etc).
 
 `backurne` connects to every "live" Ceph clusters via SSH. For each cluster, it will connect to a single node, always the same, defined in Proxmox (and / or overwritten via the configuration).\
-SSH authentification nor authorization is **not** handled by `backurne` in any way.\
+SSH authentication nor authorization is **not** handled by `backurne` in any way.\
 It is up to you to configure ssh : either accept or ignore the host keys, place your public key on the required hosts etc.
 
 Command line interface
@@ -75,8 +75,8 @@ Used technology
 ---
 
  - `RBD` is the core technology used by `backurne` : it provides snapshot export, import, diff, mapping etc.
- - `ssh` is used to transfert the snapshots between the live clusters and the backup cluster. `RBD` can be manipulated over TCP/IP, but without encryption nor compression, thus this solution was not kept.
- - `xxhash` (or other, see the configuration) is used to check the consistancy between snapshots.
+ - `ssh` is used to transfer the snapshots between the live clusters and the backup cluster. `RBD` can be manipulated over TCP/IP, but without encryption nor compression, thus this solution was not kept.
+ - `xxhash` (or other, see the configuration) is used to check the consistency between snapshots.
  - `rbd-nbd` is used to map a specific backup and inspect its content.
  - `kpartx`, `qemu-img`, `qemu-nbd`, `vmfs-tools` and `vmfs6-tools` are used for vmware exploration, `ldmtool` is used to map microsoft dynamic disks.
 
@@ -86,7 +86,7 @@ vmware support
 
 The assumption is that the rbd image you back up is a single datastore. It contains multiple vmdk, each of them is a VM disk.\
 Datastores are a specific filesystem: VMFS. There is several version, as of today. You will need `vmfs-tools` to mount VMFS up to version 5. For version 6 support, `vmfs6-tools` is required.\
-When `backurne` detects a VMFS, it will try each version until success. If no `vmfs*-tools` is avaiable, the block device is left as is.\
+When `backurne` detects a VMFS, it will try each version until success. If no `vmfs*-tools` is available, the block device is left as is.\
 Once a VMFS device is mounted, each vmdk found inside will be mapped and mounted, recursively. In theory, you could have a VMFS, with inside a VM disk (vmdk), which is itself a datastore with inside more vmdk .. This behavior is not tested, though.\
 
 
@@ -126,7 +126,7 @@ Graph and reporting
 ![alt text](https://github.com/JackSlateur/backurne/blob/master/graph_duration.png?raw=true)
 
 An ugly grafana dashboard is provided in `graph/grafana-backurne.json`, data has stored in an influxdb database.\
-It provides two informations:\
+It provides two information:\
  - the number of backups currently running, using data from telegraf (both the script and the config shall be found in `graph/telegraf/*`).
  - the duration of each backup
 
